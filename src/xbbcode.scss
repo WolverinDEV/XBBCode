@@ -1,4 +1,6 @@
 .xbbcode-tag {
+	display: inline;
+
 	&.xbbcode-tag-bold {
 		font-weight: bold;
 	}
@@ -39,7 +41,7 @@
 	}
 
 	&.xbbcode-tag-inline-code {
-		display: inline-block;
+		display: inline;
 		margin: 0;
 	}
 

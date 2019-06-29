@@ -124,6 +124,9 @@ namespace xbbcode {
         }
 
         build_html(): string {
+            if(!this.parser)
+                throw "tag (" + this.tag + ") not html buildable!";
+
             if(this.parser.build_html)
                 return this.parser.build_html(this);
             return this.parser.build_html_tag_open(this) + this.content.map(e => e.build_html()).join("") + this.parser.build_html_tag_close(this);
@@ -488,13 +491,13 @@ namespace xbbcode {
         return {
             root_tag: result,
             build_bbcode(): string {
-                return result.build_bbcode();
+                return result.content.map(e => e.build_bbcode()).join("");
             },
             build_html(): string {
-                return result.build_html();
+                return result.content.map(e => e.build_html()).join("");
             },
             build_text(): string {
-                return result.build_text();
+                return result.content.map(e => e.build_text()).join("");
             }
         };
     }
