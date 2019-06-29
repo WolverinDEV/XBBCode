@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>BBCode parser test</title>
+
+        <style>
+            .container-input, .container-output {
+                width: 100%;
+
+                display: flex;
+                flex-direction: column;
+                justify-content: stretch;
+            }
+
+            .container-input textarea {
+                flex-grow: 1;
+                flex-shrink: 1;
+
+                overflow-y: auto;
+                height: 300px;
+                margin: 20px;
+            }
+
+            .container-output .output-html {
+                border: 1px solid black;
+                margin: 20px;
+
+                min-height: 400px;
+            }
+
+            .container-output .output-text, .container-output .output-bb {
+                border: 1px solid black;
+                margin: 20px;
+
+                overflow-y: auto;
+                max-height: 200px;
+                min-height: 50px;
+            }
+
+            .container-output > a {
+                margin: 20px 20px 5px;
+            }
+        </style>
+
+        <link rel="stylesheet" type="text/css" href="../src/xbbcode.css">
+        <script src="../src/parser.js"></script>
+    </head>
+    <body>
+        <div class="container-input">
+            <textarea class="input"></textarea>
+        </div>
+        <div class="container-output">
+            <a>Output (BBCode):</a>
+            <div class="output-bb"></div>
+            <a>Output (Text):</a>
+            <div class="output-text"></div>
+            <a>Output:</a>
+            <div class="output-html"></div>
+        </div>
+
+        <script type="application/javascript">
+            const input = document.getElementsByClassName("input")[0];
+            const output_bb = document.getElementsByClassName("output-bb")[0];
+            const output_text = document.getElementsByClassName("output-text")[0];
+            const output_html = document.getElementsByClassName("output-html")[0];
+
+            input.onchange = () => {
+                const text = input.value;
+                localStorage.setItem("text", text);
+
+                const result = xbbcode.parse(text, {
+                    /*
+                    tag_whitelist: ['b'],
+                    enforce_back_whitelist: false
+                    */
+                });
+
+                output_bb.innerText = result.root_tag.content.map(e => e.build_bbcode()).join("");
+                output_text.innerText = result.root_tag.content.map(e => e.build_text()).join("");
+                output_html.innerHTML = result.root_tag.content.map(e => e.build_html()).join("");
+                console.log("Change!");
+            };
+            input.onkeyup = input.onchange;
+
+            input.textContent = localStorage.getItem("text");
+            input.onkeyup();
+        </script>
+    </body>
+</html>
+<!--
+//console.log(result.content.map(e => e.build_bbcode()).join(""));
+console.log(result.content.map(e => e.build_text()).join(""));
+console.log(result.content.map(e => e.build_html()).join(""));
