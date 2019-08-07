@@ -99,7 +99,7 @@ namespace xbbcode {
         content: Layer[];
         properly_closed: boolean;
 
-        constructor(tag: string, options?: string, content?: Layer[]) {
+        constructor(tag: string, parser: register.TagParser | undefined, options?: string, content?: Layer[]) {
             this.tag = tag;
             this.tag_normalized = this.tag.toLowerCase();
 
@@ -107,7 +107,7 @@ namespace xbbcode {
             this.content = content || [];
             this.properly_closed = false;
 
-            this.parser = register.find_parser(this.tag_normalized);
+            this.parser = parser;
         }
 
         build_text(): string {
@@ -158,7 +158,7 @@ namespace xbbcode {
                 this.text_position = position_or_begin;
             }
 
-            this.text = this.text.replace(/(?<!\\)\\\[/gm, '[').replace(/\\\\/gm, '\\');
+            //this.text = this.text.replace(/(?<!\\)\\\[/gm, '[').replace(/\\\\/gm, '\\');
         }
 
         build_text(): string {
@@ -309,7 +309,7 @@ namespace xbbcode {
             return this[this.length - 1];
         };
 
-        stack.push(new TagLayer(""));
+        stack.push(new TagLayer("", undefined));
         stack.back().text_position = {
             end: text.length,
             start: 0
@@ -371,10 +371,22 @@ namespace xbbcode {
             parse_tag:
             if(!ignore_tag) {
                 const tag = parse_tag(raw_tag);
+                const parser = register.find_parser(tag.tag.toLowerCase());
+
+                /* we dont want to parse tags which we dont known */
+                if(!parser) {
+                    ignore_tag = true;
+                    break parse_tag;
+                }
 
                 black_white_check:
                 if(!black_whitelist.accept_tag(tag.tag.toLowerCase())) {
-                    const parser = register.find_parser(tag.tag.toLowerCase());
+                    /* this check is redundant to the upper check, but we will may make the upper check optional/configurable thats why this is def. required */
+                    if(!parser) {
+                        ignore_tag = true;
+                        break parse_tag;
+                    }
+
                     if(parser.ignore_black_whitelist && !options.enforce_back_whitelist)
                         break black_white_check;
 
@@ -410,7 +422,7 @@ namespace xbbcode {
                         ignore_tag = true;
                     }
                 } else {
-                    const element = new TagLayer(tag.tag, tag.options);
+                    const element = new TagLayer(tag.tag, parser, tag.options);
                     element.text_position = {
                         start: index - 1, /* we want the brace start */
                         end: -1
