@@ -5,6 +5,7 @@
 namespace xbbcode {
     export namespace patterns {
         export const tag = /^\/?(([a-zA-Z_\-]+(=[\S ]+)?)|(\*))$/g;
+        export const tag_escape = /\[|\\(?=\\*\[)/g;
         export const url = /^(?:https?|file|c):(?:\/{1,3}|\\{1})[-a-zA-Z0-9:;,@#%&()~_?\+=\/\\\.]*$/g;
         export const color_name = /^(?:aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|black|blanchedalmond|blue|blueviolet|brown|burlywood|cadetblue|chartreuse|chocolate|coral|cornflowerblue|cornsilk|crimson|cyan|darkblue|darkcyan|darkgoldenrod|darkgray|darkgreen|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|darkred|darksalmon|darkseagreen|darkslateblue|darkslategray|darkturquoise|darkviolet|deeppink|deepskyblue|dimgray|dodgerblue|firebrick|floralwhite|forestgreen|fuchsia|gainsboro|ghostwhite|gold|goldenrod|gray|green|greenyellow|honeydew|hotpink|indianred|indigo|ivory|khaki|lavender|lavenderblush|lawngreen|lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|lightgray|lightgreen|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategray|lightsteelblue|lightyellow|lime|limegreen|linen|magenta|maroon|mediumaquamarine|mediumblue|mediumorchid|mediumpurple|mediumseagreen|mediumslateblue|mediumspringgreen|mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|moccasin|navajowhite|navy|oldlace|olive|olivedrab|orange|orangered|orchid|palegoldenrod|palegreen|paleturquoise|palevioletred|papayawhip|peachpuff|peru|pink|plum|powderblue|purple|red|rosybrown|royalblue|saddlebrown|salmon|sandybrown|seagreen|seashell|sienna|silver|skyblue|slateblue|slategray|snow|springgreen|steelblue|tan|teal|thistle|tomato|turquoise|violet|wheat|white|whitesmoke|yellow|yellowgreen)$/g;
         export const color_code = /^#?([a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/g;
@@ -142,35 +143,43 @@ namespace xbbcode {
     }
 
     export class TextLayer implements Layer, TextReferenced {
-        text: string;
+        raw_text: string;
+        bb_escape_characters: number[];
 
         text_position: TextPosition;
 
-        constructor(text: string, position_or_begin: number | TextPosition, end?: number) {
+        constructor(text: string, escapes: number[], position_or_begin: number | TextPosition, end?: number) {
             if(typeof(position_or_begin) === "number") {
-                this.text = text.substring(position_or_begin, end);
+                this.raw_text = text.substring(position_or_begin, end);
                 this.text_position = {
                     end: end,
                     start: position_or_begin
-                }
+                };
+                this.bb_escape_characters = escapes.map(e => e - position_or_begin);
             } else {
-                this.text = text;
+                this.raw_text = text;
                 this.text_position = position_or_begin;
+                this.bb_escape_characters = escapes;
             }
-
-            //this.text = this.text.replace(/(?<!\\)\\\[/gm, '[').replace(/\\\\/gm, '\\');
+            this.bb_escape_characters = this.bb_escape_characters.sort((a, b) => b - a);
         }
 
         build_text(): string {
-            return this.text;
+            if(!this.bb_escape_characters)
+                return this.raw_text;
+
+            let text = this.raw_text;
+            for(const index of this.bb_escape_characters)
+                text = text.substring(0, index) + text.substring(index + 1);
+            return text;
         }
 
         build_bbcode(): string {
-            return this.text;
+            return this.raw_text;
         }
 
         build_html(): string {
-            return TextLayer.html_escaped(this.text);
+            return TextLayer.html_escaped(this.build_text());
         }
 
         public static html_escaped(text: string) {
@@ -226,22 +235,26 @@ namespace xbbcode {
             let left = layer.content[index];
             if(!(left instanceof TextLayer)) {
                 if(left instanceof TagLayer && left.deductible_as_text())
-                    left = (layer.content[index] = new TextLayer(left.deduct_as_text(), left.text_position));
+                    left = (layer.content[index] = new TextLayer(left.deduct_as_text(), [], left.text_position));
                 else
                     continue;
+            } else if(left.bb_escape_characters) {
+                continue; /* Text isn't plain. Contains escape characters */
             }
 
             let right = layer.content[index + 1];
             if(!(right instanceof TextLayer)) {
                 if(right instanceof TagLayer && right.deductible_as_text())
-                    right = (layer.content[index + 1] = new TextLayer(right.deduct_as_text(), right.text_position));
+                    right = (layer.content[index + 1] = new TextLayer(right.deduct_as_text(), [], right.text_position));
                 else {
                     index++; /* if we shift it by one then right will be come left and we will still have a continue! */
                     continue;
                 }
+            } else if(right.bb_escape_characters) {
+                continue; /* Text isn't plain. Contains escape characters */
             }
 
-            (left as TextLayer).text += (right as TextLayer).text;
+            (left as TextLayer).raw_text += (right as TextLayer).raw_text;
             (left as TextLayer).text_position.end = (right as TextLayer).text_position.end;
             layer.content.splice(index + 1, 1);
             index--;
@@ -316,17 +329,33 @@ namespace xbbcode {
         };
         black_whitelist = build_black_white_list(stack, options);
 
-        let base_index, index = 0, needle_index;
+        let escaped = [];
+        let base_index, index = 0, needle_index, escape_length;
         while(true) {
             base_index = index;
 
-            /* find the open tag */
+            /* find the open bracket */
             needle_index = index;
             while(true) {
                 needle_index = text.indexOf('[', needle_index);
-                if(needle_index > 0 && text[needle_index - 1] == '\\') {
-                    needle_index++;
-                    continue;
+
+                if(needle_index > 0) {
+                    escape_length = 0;
+                    while(needle_index - escape_length > 0) {
+                        if(text[needle_index - escape_length - 1] != '\\')
+                            break;
+                        escape_length++;
+                    }
+
+                    for(let index = 0; index < escape_length; index += 2)
+                        escaped.push(needle_index - index - 1);
+
+                    console.log(escape_length);
+                    if(escape_length % 2 == 1) {
+                        //Tag isn't escaped. The escape has been escaped
+                        needle_index++;
+                        continue;
+                    }
                 }
 
                 break;
@@ -335,12 +364,13 @@ namespace xbbcode {
             if(needle_index == -1) { /* no close bracket */
                 /* get the last message */
                 if(index < text.length)
-                    stack.back().content.push(new TextLayer(text, index, text.length));
+                    stack.back().content.push(new TextLayer(text, escaped, index, text.length));
                 break;
             }
             if(index != needle_index) {
                 /* get the message before */
-                stack.back().content.push(new TextLayer(text, index, needle_index));
+                stack.back().content.push(new TextLayer(text, escaped, index, needle_index));
+                escaped = [];
                 index = needle_index;
             }
 
@@ -350,9 +380,23 @@ namespace xbbcode {
             /* find the next close bracket for the open tag */
             while(true) {
                 needle_index = text.indexOf(']', needle_index);
-                if(needle_index > 0 && text[needle_index - 1] == '\\') {
-                    needle_index++;
-                    continue;
+
+                if(needle_index > 0) {
+                    escape_length = 0;
+                    while(needle_index - escape_length > 0) {
+                        if(text[needle_index - escape_length - 1] != '\\')
+                            break;
+                        escape_length++;
+                    }
+
+                    for(let index = 0; index < escape_length; index += 2)
+                        escaped.push(needle_index - index - 1);
+
+                    if(escape_length % 2 == 1) {
+                        //Tag isn't escaped. The escape has been escaped
+                        needle_index++;
+                        continue;
+                    }
                 }
 
                 break;
@@ -361,7 +405,7 @@ namespace xbbcode {
             if(needle_index == -1) { /* no close bracket for close tag */
                 /* get the last message */
                 if(index < text.length)
-                    stack.back().content.push(new TextLayer(text, index - 1, text.length));
+                    stack.back().content.push(new TextLayer(text, escaped, index - 1, text.length));
                 break;
             }
 
@@ -372,11 +416,12 @@ namespace xbbcode {
             if(!ignore_tag) {
                 const tag = parse_tag(raw_tag);
                 const parser = register.find_parser(tag.tag.toLowerCase());
-
-                /* we dont want to parse tags which we dont known */
-                if(!parser) {
-                    ignore_tag = true;
-                    break parse_tag;
+                if(tag.tag) {
+                    /* we dont want to parse tags which we dont known */
+                    if(!parser) {
+                        ignore_tag = true;
+                        break parse_tag;
+                    }
                 }
 
                 black_white_check:
@@ -469,7 +514,8 @@ namespace xbbcode {
             }
 
             if(ignore_tag) {
-                stack.back().content.push(new TextLayer(text, index - 1, needle_index + 1));
+                stack.back().content.push(new TextLayer(text, escaped, index - 1, needle_index + 1));
+                escaped = [];
                 index = needle_index + 1;
                 continue;
             }
@@ -493,7 +539,7 @@ namespace xbbcode {
             layer.content.forEach(e => print_stack(e, prefix + "  "));
         } else if(layer instanceof TextLayer) {
             console.log(prefix + "Range: %d - %d", layer.text_position.start, layer.text_position.end);
-            console.log(prefix + "Text: " + layer.text);
+            console.log(prefix + "Raw Text: " + layer.raw_text);
         }
     }
 
@@ -512,6 +558,10 @@ namespace xbbcode {
                 return result.content.map(e => e.build_text()).join("");
             }
         };
+    }
+
+    export function escape(text: string) {
+        return text.replace(patterns.tag_escape, c => "\\" + c);
     }
 }
 
@@ -555,17 +605,12 @@ namespace xbbcode {
             content_tags_whitelist: [],
 
             build_html_tag_open(layer: xbbcode.TagLayer): string {
-                if(layer.tag_normalized != 'code')
-                    return '<span class="xbbcode-tag xbbcode-tag-inline-code">';
-                else
-                    return '<div class="xbbcode-tag xbbcode-tag-code">';
+                const klass = layer.tag_normalized != 'code' ? "xbbcode-tag-inline-code" : "xbbcode-tag-code";
+                return '<code class="xbbcode-tag ' + klass + '" x-code-type="' + (layer.options || "").replace("\"", "'") + '">';
             },
 
             build_html_tag_close(layer: xbbcode.TagLayer): string {
-                if(layer.tag_normalized != 'code')
-                    return '</span>';
-                else
-                    return '</div>';
+                return '</code>';
             }
         });
 
@@ -586,6 +631,7 @@ namespace xbbcode {
                 } else {
                     color = options;
                 }
+                color = color.replace("\"", "'");
 
                 if(layer.tag_normalized == 'color')
                     return '<span class="xbbcode-tag xbbcode-tag-color" style="color: ' + color.toLowerCase() + '">';
@@ -655,7 +701,7 @@ namespace xbbcode {
                 if (!patterns.url.test(target))
                     target = '#';
 
-                return '<a class="xbbcode-tag xbbcode-tag-url" href="' + target + '" target="_blank">';
+                return '<a class="xbbcode-tag xbbcode-tag-url" href="' + target.replace("\"", "'") + '" target="_blank">';
             },
 
             build_html_tag_close(layer: xbbcode.TagLayer): string {
@@ -677,7 +723,7 @@ namespace xbbcode {
                 if (!patterns.url.test(target))
                     target = '#';
 
-                return '<img class="xbbcode-tag xbbcode-tag-url" src="' + target + '" title="' + TextLayer.html_escaped(content) + '"/>';
+                return '<img class="xbbcode-tag xbbcode-tag-url" src="' + target.replace("\"", "'") + '" title="' + TextLayer.html_escaped(content) + '"/>';
             }
         });
         //register.register_parser(html_enclosed_tag(['quote'], 'span', 'quote'));

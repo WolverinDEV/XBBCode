@@ -6,6 +6,7 @@ var xbbcode;
     let patterns;
     (function (patterns) {
         patterns.tag = /^\/?(([a-zA-Z_\-]+(=[\S ]+)?)|(\*))$/g;
+        patterns.tag_escape = /\[|\\(?=\\*\[)/g;
         patterns.url = /^(?:https?|file|c):(?:\/{1,3}|\\{1})[-a-zA-Z0-9:;,@#%&()~_?\+=\/\\\.]*$/g;
         patterns.color_name = /^(?:aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|black|blanchedalmond|blue|blueviolet|brown|burlywood|cadetblue|chartreuse|chocolate|coral|cornflowerblue|cornsilk|crimson|cyan|darkblue|darkcyan|darkgoldenrod|darkgray|darkgreen|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|darkred|darksalmon|darkseagreen|darkslateblue|darkslategray|darkturquoise|darkviolet|deeppink|deepskyblue|dimgray|dodgerblue|firebrick|floralwhite|forestgreen|fuchsia|gainsboro|ghostwhite|gold|goldenrod|gray|green|greenyellow|honeydew|hotpink|indianred|indigo|ivory|khaki|lavender|lavenderblush|lawngreen|lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|lightgray|lightgreen|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategray|lightsteelblue|lightyellow|lime|limegreen|linen|magenta|maroon|mediumaquamarine|mediumblue|mediumorchid|mediumpurple|mediumseagreen|mediumslateblue|mediumspringgreen|mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|moccasin|navajowhite|navy|oldlace|olive|olivedrab|orange|orangered|orchid|palegoldenrod|palegreen|paleturquoise|palevioletred|papayawhip|peachpuff|peru|pink|plum|powderblue|purple|red|rosybrown|royalblue|saddlebrown|salmon|sandybrown|seagreen|seashell|sienna|silver|skyblue|slateblue|slategray|snow|springgreen|steelblue|tan|teal|thistle|tomato|turquoise|violet|wheat|white|whitesmoke|yellow|yellowgreen)$/g;
         patterns.color_code = /^#?([a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/g;
@@ -34,13 +35,13 @@ var xbbcode;
         const registered_tags = {};
     })(register = xbbcode.register || (xbbcode.register = {}));
     class TagLayer {
-        constructor(tag, options, content) {
+        constructor(tag, parser, options, content) {
             this.tag = tag;
             this.tag_normalized = this.tag.toLowerCase();
             this.options = options;
             this.content = content || [];
             this.properly_closed = false;
-            this.parser = register.find_parser(this.tag_normalized);
+            this.parser = parser;
         }
         build_text() {
             if (!this.parser)
@@ -69,28 +70,35 @@ var xbbcode;
     }
     xbbcode.TagLayer = TagLayer;
     class TextLayer {
-        constructor(text, position_or_begin, end) {
+        constructor(text, escapes, position_or_begin, end) {
             if (typeof (position_or_begin) === "number") {
-                this.text = text.substring(position_or_begin, end);
+                this.raw_text = text.substring(position_or_begin, end);
                 this.text_position = {
                     end: end,
                     start: position_or_begin
                 };
+                this.bb_escape_characters = escapes.map(e => e - position_or_begin);
             }
             else {
-                this.text = text;
+                this.raw_text = text;
                 this.text_position = position_or_begin;
+                this.bb_escape_characters = escapes;
             }
-            this.text = this.text.replace(/(?<!\\)\\\[/gm, '[').replace(/\\\\/gm, '\\');
+            this.bb_escape_characters = this.bb_escape_characters.sort((a, b) => b - a);
         }
         build_text() {
-            return this.text;
+            if (!this.bb_escape_characters)
+                return this.raw_text;
+            let text = this.raw_text;
+            for (const index of this.bb_escape_characters)
+                text = text.substring(0, index) + text.substring(index + 1);
+            return text;
         }
         build_bbcode() {
-            return this.text;
+            return this.raw_text;
         }
         build_html() {
-            return TextLayer.html_escaped(this.text);
+            return TextLayer.html_escaped(this.build_text());
         }
         static html_escaped(text) {
             if (typeof (document) !== "undefined" && 'createTextNode' in document) {
@@ -142,20 +150,26 @@ var xbbcode;
             let left = layer.content[index];
             if (!(left instanceof TextLayer)) {
                 if (left instanceof TagLayer && left.deductible_as_text())
-                    left = (layer.content[index] = new TextLayer(left.deduct_as_text(), left.text_position));
+                    left = (layer.content[index] = new TextLayer(left.deduct_as_text(), [], left.text_position));
                 else
                     continue;
+            }
+            else if (left.bb_escape_characters) {
+                continue; /* Text isn't plain. Contains escape characters */
             }
             let right = layer.content[index + 1];
             if (!(right instanceof TextLayer)) {
                 if (right instanceof TagLayer && right.deductible_as_text())
-                    right = (layer.content[index + 1] = new TextLayer(right.deduct_as_text(), right.text_position));
+                    right = (layer.content[index + 1] = new TextLayer(right.deduct_as_text(), [], right.text_position));
                 else {
                     index++; /* if we shift it by one then right will be come left and we will still have a continue! */
                     continue;
                 }
             }
-            left.text += right.text;
+            else if (right.bb_escape_characters) {
+                continue; /* Text isn't plain. Contains escape characters */
+            }
+            left.raw_text += right.raw_text;
             left.text_position.end = right.text_position.end;
             layer.content.splice(index + 1, 1);
             index--;
@@ -211,34 +225,48 @@ var xbbcode;
         stack.back = function () {
             return this[this.length - 1];
         };
-        stack.push(new TagLayer(""));
+        stack.push(new TagLayer("", undefined));
         stack.back().text_position = {
             end: text.length,
             start: 0
         };
         black_whitelist = build_black_white_list(stack, options);
-        let base_index, index = 0, needle_index;
+        let escaped = [];
+        let base_index, index = 0, needle_index, escape_length;
         while (true) {
             base_index = index;
-            /* find the open tag */
+            /* find the open bracket */
             needle_index = index;
             while (true) {
                 needle_index = text.indexOf('[', needle_index);
-                if (needle_index > 0 && text[needle_index - 1] == '\\') {
-                    needle_index++;
-                    continue;
+                if (needle_index > 0) {
+                    escape_length = 0;
+                    while (needle_index - escape_length > 0) {
+                        if (text[needle_index - escape_length - 1] != '\\')
+                            break;
+                        escape_length++;
+                    }
+                    for (let index = 0; index < escape_length; index += 2)
+                        escaped.push(needle_index - index - 1);
+                    console.log(escape_length);
+                    if (escape_length % 2 == 1) {
+                        //Tag isn't escaped. The escape has been escaped
+                        needle_index++;
+                        continue;
+                    }
                 }
                 break;
             }
             if (needle_index == -1) { /* no close bracket */
                 /* get the last message */
                 if (index < text.length)
-                    stack.back().content.push(new TextLayer(text, index, text.length));
+                    stack.back().content.push(new TextLayer(text, escaped, index, text.length));
                 break;
             }
             if (index != needle_index) {
                 /* get the message before */
-                stack.back().content.push(new TextLayer(text, index, needle_index));
+                stack.back().content.push(new TextLayer(text, escaped, index, needle_index));
+                escaped = [];
                 index = needle_index;
             }
             index = needle_index + 1; /* tag begin */
@@ -246,24 +274,47 @@ var xbbcode;
             /* find the next close bracket for the open tag */
             while (true) {
                 needle_index = text.indexOf(']', needle_index);
-                if (needle_index > 0 && text[needle_index - 1] == '\\') {
-                    needle_index++;
-                    continue;
+                if (needle_index > 0) {
+                    escape_length = 0;
+                    while (needle_index - escape_length > 0) {
+                        if (text[needle_index - escape_length - 1] != '\\')
+                            break;
+                        escape_length++;
+                    }
+                    for (let index = 0; index < escape_length; index += 2)
+                        escaped.push(needle_index - index - 1);
+                    if (escape_length % 2 == 1) {
+                        //Tag isn't escaped. The escape has been escaped
+                        needle_index++;
+                        continue;
+                    }
                 }
                 break;
             }
             if (needle_index == -1) { /* no close bracket for close tag */
                 /* get the last message */
                 if (index < text.length)
-                    stack.back().content.push(new TextLayer(text, index - 1, text.length));
+                    stack.back().content.push(new TextLayer(text, escaped, index - 1, text.length));
                 break;
             }
             const raw_tag = text.substring(index, needle_index);
             let ignore_tag = !raw_tag.match(patterns.tag) && raw_tag != "/";
             parse_tag: if (!ignore_tag) {
                 const tag = parse_tag(raw_tag);
+                const parser = register.find_parser(tag.tag.toLowerCase());
+                if (tag.tag) {
+                    /* we dont want to parse tags which we dont known */
+                    if (!parser) {
+                        ignore_tag = true;
+                        break parse_tag;
+                    }
+                }
                 black_white_check: if (!black_whitelist.accept_tag(tag.tag.toLowerCase())) {
-                    const parser = register.find_parser(tag.tag.toLowerCase());
+                    /* this check is redundant to the upper check, but we will may make the upper check optional/configurable thats why this is def. required */
+                    if (!parser) {
+                        ignore_tag = true;
+                        break parse_tag;
+                    }
                     if (parser.ignore_black_whitelist && !options.enforce_back_whitelist)
                         break black_white_check;
                     /* test if this might be the close tag to the last open tag */
@@ -298,7 +349,7 @@ var xbbcode;
                     }
                 }
                 else {
-                    const element = new TagLayer(tag.tag, tag.options);
+                    const element = new TagLayer(tag.tag, parser, tag.options);
                     element.text_position = {
                         start: index - 1,
                         end: -1
@@ -343,7 +394,8 @@ var xbbcode;
                 }
             }
             if (ignore_tag) {
-                stack.back().content.push(new TextLayer(text, index - 1, needle_index + 1));
+                stack.back().content.push(new TextLayer(text, escaped, index - 1, needle_index + 1));
+                escaped = [];
                 index = needle_index + 1;
                 continue;
             }
@@ -364,7 +416,7 @@ var xbbcode;
         }
         else if (layer instanceof TextLayer) {
             console.log(prefix + "Range: %d - %d", layer.text_position.start, layer.text_position.end);
-            console.log(prefix + "Text: " + layer.text);
+            console.log(prefix + "Raw Text: " + layer.raw_text);
         }
     }
     function parse(text, options) {
@@ -384,6 +436,10 @@ var xbbcode;
         };
     }
     xbbcode.parse = parse;
+    function escape(text) {
+        return text.replace(patterns.tag_escape, c => "\\" + c);
+    }
+    xbbcode.escape = escape;
 })(xbbcode || (xbbcode = {}));
 /* register all BBCode tags */
 (function (xbbcode) {
@@ -418,16 +474,11 @@ var xbbcode;
             tag: ['code', 'icode', 'i-code'],
             content_tags_whitelist: [],
             build_html_tag_open(layer) {
-                if (layer.tag_normalized != 'code')
-                    return '<span class="xbbcode-tag xbbcode-tag-inline-code">';
-                else
-                    return '<div class="xbbcode-tag xbbcode-tag-code">';
+                const klass = layer.tag_normalized != 'code' ? "xbbcode-tag-inline-code" : "xbbcode-tag-code";
+                return '<code class="xbbcode-tag ' + klass + '" x-code-type="' + (layer.options || "").replace("\"", "'") + '">';
             },
             build_html_tag_close(layer) {
-                if (layer.tag_normalized != 'code')
-                    return '</span>';
-                else
-                    return '</div>';
+                return '</code>';
             }
         });
         xbbcode.register.register_parser({
@@ -446,6 +497,7 @@ var xbbcode;
                 else {
                     color = options;
                 }
+                color = color.replace("\"", "'");
                 if (layer.tag_normalized == 'color')
                     return '<span class="xbbcode-tag xbbcode-tag-color" style="color: ' + color.toLowerCase() + '">';
                 else
@@ -501,7 +553,7 @@ var xbbcode;
                 xbbcode.patterns.url.lastIndex = 0;
                 if (!xbbcode.patterns.url.test(target))
                     target = '#';
-                return '<a class="xbbcode-tag xbbcode-tag-url" href="' + target + '" target="_blank">';
+                return '<a class="xbbcode-tag xbbcode-tag-url" href="' + target.replace("\"", "'") + '" target="_blank">';
             },
             build_html_tag_close(layer) {
                 return '</a>';
@@ -520,7 +572,7 @@ var xbbcode;
                 xbbcode.patterns.url.lastIndex = 0;
                 if (!xbbcode.patterns.url.test(target))
                     target = '#';
-                return '<img class="xbbcode-tag xbbcode-tag-url" src="' + target + '" title="' + xbbcode.TextLayer.html_escaped(content) + '"/>';
+                return '<img class="xbbcode-tag xbbcode-tag-url" src="' + target.replace("\"", "'") + '" title="' + xbbcode.TextLayer.html_escaped(content) + '"/>';
             }
         });
         //register.register_parser(html_enclosed_tag(['quote'], 'span', 'quote'));
