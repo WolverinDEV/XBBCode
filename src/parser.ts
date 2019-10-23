@@ -65,6 +65,8 @@ namespace xbbcode {
         tag_whitelist?: string[] | undefined;
 
         enforce_back_whitelist?: boolean; /* include tags like no-parse or control tags to be filtered */
+
+        verbose?: boolean;
     }
 
     export interface Result {
@@ -350,7 +352,6 @@ namespace xbbcode {
                     for(let index = 0; index < escape_length; index += 2)
                         escaped.push(needle_index - index - 1);
 
-                    console.log(escape_length);
                     if(escape_length % 2 == 1) {
                         //Tag isn't escaped. The escape has been escaped
                         needle_index++;
@@ -415,18 +416,18 @@ namespace xbbcode {
             parse_tag:
             if(!ignore_tag) {
                 const tag = parse_tag(raw_tag);
-                const parser = register.find_parser(tag.tag.toLowerCase());
-                if(tag.tag) {
+                const parser = tag.tag ? register.find_parser(tag.tag.toLowerCase()) : undefined;
+
+                //TODO: Option if we want to support the "lazy" close tags: [/]
+                if(tag.tag && !parser) {
                     /* we dont want to parse tags which we dont known */
-                    if(!parser) {
-                        ignore_tag = true;
-                        break parse_tag;
-                    }
+                    ignore_tag = true;
+                    break parse_tag;
                 }
 
                 black_white_check:
                 if(!black_whitelist.accept_tag(tag.tag.toLowerCase())) {
-                    /* this check is redundant to the upper check, but we will may make the upper check optional/configurable thats why this is def. required */
+                    /* we do not support this tag. Check if parse is null because if so we encountered a "lazy" close tag */
                     if(!parser) {
                         ignore_tag = true;
                         break parse_tag;
@@ -441,7 +442,7 @@ namespace xbbcode {
                         break parse_tag;
                     }
                 }
-                console.log("Tag %o", tag);
+
                 if(tag.close) {
                     const tag_normalized = tag.tag.toLowerCase();
                     let stack_index = stack.length;
@@ -545,7 +546,8 @@ namespace xbbcode {
 
     export function parse(text: string, options: Options) : Result {
         const result = parse_layers(text, options);
-        print_stack(result);
+        if(options.verbose)
+            print_stack(result);
         return {
             root_tag: result,
             build_bbcode(): string {
