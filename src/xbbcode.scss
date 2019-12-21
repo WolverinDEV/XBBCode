@@ -63,4 +63,31 @@
 		display: block;
 		padding-inline-start: 1.25em;
 	}
+
+	&.xbbcode-tag-table {
+		display: block;
+		margin: .25em .5em;
+
+		border-spacing: 0;
+		border-collapse: collapse;
+
+		td, th {
+			padding: 6px 13px;
+			border: 1px solid #dfe2e5;
+		}
+
+		th {
+			font-weight: 600;
+			text-align: center;
+		}
+
+		tr:nth-child(2n) {
+			background-color: #f6f8fa;
+		}
+
+		tr {
+			background-color: #fff;
+			border-top: 1px solid #c6cbd1;
+		}
+	}
 }

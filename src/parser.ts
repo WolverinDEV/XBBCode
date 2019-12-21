@@ -778,6 +778,63 @@ namespace xbbcode {
         });
 
         //TODO: Table ([table] & [td] [th] [tr])
+        register.register_parser({
+            tag: ['table'],
+            build_html_tag_open(layer: xbbcode.TagLayer): string {
+                const rows = layer.content.filter(e => e instanceof TagLayer && e.tag_normalized === "tr").map(e => e as TagLayer);
+                const header_row = rows.find(e => e.content.find(e => e instanceof TagLayer && e.tag_normalized === "th") !== undefined);
+                if(header_row) {
+                    //Apply style from the header to the full column
+                    const column_styles = header_row.content.filter(e => e instanceof TagLayer).map(e => e as TagLayer).map(e => {
+                        const style = e.options || "left";
+                        e.options = undefined;
+                        return style;
+                    });
+
+                    for(const row of rows) {
+                        const columns = row.content.filter(e => e instanceof TagLayer).map(e => e as TagLayer);
+                        if(columns.length == 0) continue;
+                        if(columns[0].tag_normalized === "th") continue;
+
+                        columns.forEach((column, index) => {
+                            if(index < column_styles.length)
+                                column.options = column.options || column_styles[index];
+                        });
+                    }
+
+                }
+                return '<table class="xbbcode-tag xbbcode-tag-table">';
+            },
+
+            build_html_tag_close(layer: xbbcode.TagLayer): string {
+                return '</table>';
+            }
+        });
+
+        const alignments = {
+            "center": "center",
+            "c": "center",
+
+            "left": "left",
+            "l": "left",
+
+            "right": "right",
+            "r": "right"
+        };
+
+        register.register_parser({
+            tag: ['tr', 'th', 'td'],
+            build_html_tag_open(layer: xbbcode.TagLayer): string {
+                const alignment = alignments[(layer.options || "").toLowerCase()];
+                if(alignment)
+                    return '<' + layer.tag_normalized + " style='text-align: " + alignment + ";'>";
+                return '<' + layer.tag_normalized + '>';
+            },
+
+            build_html_tag_close(layer: xbbcode.TagLayer): string {
+                return '</' + layer.tag_normalized + '>';
+            }
+        });
     }
 }
 
