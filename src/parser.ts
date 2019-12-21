@@ -748,7 +748,8 @@ namespace xbbcode {
         });
 
         const list_mapping: {[key: string]:string} = {
-            'list': 'ul',
+            'ul': 'ul',
+            'ol': 'ol',
             'ordered-list': 'ol',
             'olist': 'ol',
             'unordered-list': 'ul',
@@ -766,7 +767,7 @@ namespace xbbcode {
         });
 
         register.register_parser({
-            tag: '*',
+            tag: ['*', 'li'],
             build_html_tag_open(layer: xbbcode.TagLayer): string {
                 return '<li>';
             },
