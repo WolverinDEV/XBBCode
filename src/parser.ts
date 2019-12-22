@@ -750,6 +750,7 @@ namespace xbbcode {
         const list_mapping: {[key: string]:string} = {
             'ul': 'ul',
             'ol': 'ol',
+            'list': 'ol',
             'ordered-list': 'ol',
             'olist': 'ol',
             'unordered-list': 'ul',
@@ -758,7 +759,8 @@ namespace xbbcode {
         register.register_parser({
             tag: Object.keys(list_mapping),
             build_html_tag_open(layer: xbbcode.TagLayer): string {
-                return '<' + list_mapping[layer.tag_normalized] + ' class="xbbcode-tag xbbcode-tag-list">';
+                const type = layer.options ? " type='" + layer.options + "'" : "";
+                return '<' + list_mapping[layer.tag_normalized] + ' class="xbbcode-tag xbbcode-tag-list"' + type + '>';
             },
 
             build_html_tag_close(layer: xbbcode.TagLayer): string {
@@ -777,7 +779,6 @@ namespace xbbcode {
             }
         });
 
-        //TODO: Table ([table] & [td] [th] [tr])
         register.register_parser({
             tag: ['table'],
             build_html_tag_open(layer: xbbcode.TagLayer): string {

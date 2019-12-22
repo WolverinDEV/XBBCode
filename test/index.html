@@ -74,7 +74,8 @@
                     tag_whitelist: ['b'],
                     enforce_back_whitelist: false
                     */
-                    tag_blacklist: []
+                    tag_blacklist: [],
+                    verbose: true
                 });
 
                 output_bb.innerText = result.root_tag.content.map(e => e.build_bbcode()).join("");
