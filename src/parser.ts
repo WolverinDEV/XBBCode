@@ -836,6 +836,21 @@ namespace xbbcode {
                 return '</' + layer.tag_normalized + '>';
             }
         });
+
+        const vid_regex = /^(?:http(?:s)?:\/\/)?(?:www\.)?(?:m\.)?(?:youtu\.be\/|youtube\.com\/(?:(?:watch)?\?(?:.*&)?v(?:i)?=|(?:embed|v|vi|user)\/))([^\?&\"'>]{10,11})$/;
+        register.register_parser({
+            tag: ["yt", "youtube"],
+            build_html(layer: xbbcode.TagLayer): string {
+                const result = layer.build_text().match(vid_regex);
+                if(!result || !result[1])
+                    return "-- failed to get video id --";
+
+                //<iframe width="1440" height="762"
+                // src="https://www.youtube.com/embed/7cjVj1ZyzyE"
+                // frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                return '<iframe class="xbbcode-tag xbbcode-tag-video" src="https://www.youtube.com/embed/' + result[1] + '" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>'
+            }
+        })
     }
 }
 

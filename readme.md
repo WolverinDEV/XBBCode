@@ -1,5 +1,9 @@
 # XBBCode parser
 
+## Attention
+Do not use the HTML output without verify it!  
+Its highly recommended to send it throw DOMPurify!
+
 ## Test code
 ```bbcode
 [color=red]this should be red[/color]

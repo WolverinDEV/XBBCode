@@ -90,4 +90,13 @@
 			border-top: 1px solid #c6cbd1;
 		}
 	}
+
+	&.xbbcode-tag-video {
+		display: block;
+		margin: .5em;
+
+		& + br {
+			content: " "; /* hide the br, because the video is already a block */
+		}
+	}
 }
