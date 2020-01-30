@@ -190,7 +190,7 @@ namespace xbbcode {
                 const node_p = document.createElement('p');
 
                 node_p.appendChild(node_text);
-                return node_p.innerHTML.replace(/\n/g, '<br>');
+                return node_p.innerHTML.replace(" ", "&nbsp;").replace(/\n/g, '<br>');
             } else {
                 return text.replace(/[&<"' ]/g, function(m) {
                     switch (m) {
