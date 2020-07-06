@@ -6,6 +6,7 @@ import { parse as parseBBCode } from "xbbcode/parser";
 import TextRenderer from "xbbcode/renderer/text";
 import BBCodeRenderer from "xbbcode/renderer/bbcode";
 import ReactRenderer from "xbbcode/renderer/react";
+import HTMLRenderer from "xbbcode/renderer/html";
 
 import {XBBCodeRenderer} from "xbbcode/react";
 
@@ -17,6 +18,7 @@ const output_html = document.getElementsByClassName("output-html")[0] as HTMLDiv
 const rendererText = new TextRenderer();
 const rendererBBCode = new BBCodeRenderer();
 const rendererReact = new ReactRenderer();
+const rendererHTML = new HTMLRenderer();
 
 input.onchange = () => {
     const text = input.value;
@@ -27,7 +29,8 @@ input.onchange = () => {
         parsed: 0,
         renderedText: 0,
         renderedBBCode: 0,
-        renderedReact: 0
+        renderedReact: 0,
+        renderedHTML: 0
     };
 
     const result = parseBBCode(text, {
@@ -51,16 +54,21 @@ input.onchange = () => {
     
     /* this is alternative B; This will parse the text by itself */
     //ReactDOM.render(<XBBCodeRenderer>{text}</XBBCodeRenderer>, output_html);
-
     timings.renderedReact = performance.now();
 
-    console.log("Updated output fields. Timings: {parse: %d, render: {text: %d, bb-code: %d, react: %d}}",
+    console.log(result.map(rendererHTML.render.bind(rendererHTML)).join(""));
+    timings.renderedHTML = performance.now();
+
+    console.log("Updated output fields. Timings: {parse: %d, render: {text: %d, bb-code: %d, react: %d, html: %d}}",
         timings.parsed - timings.begin,
         timings.renderedText - timings.parsed,
         timings.renderedBBCode - timings.renderedText,
-        timings.renderedReact - timings.renderedBBCode);
+        timings.renderedReact - timings.renderedBBCode,
+        timings.renderedHTML - timings.renderedReact);
 };
 input.onkeyup = input.onchange;
 
 input.textContent = localStorage.getItem("text");
 input.onkeyup(undefined);
+
+export = {};
