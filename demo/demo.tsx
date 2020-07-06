@@ -7,8 +7,8 @@ import TextRenderer from "xbbcode/renderer/text";
 import BBCodeRenderer from "xbbcode/renderer/bbcode";
 import ReactRenderer from "xbbcode/renderer/react";
 import HTMLRenderer from "xbbcode/renderer/html";
-
-import {XBBCodeRenderer} from "xbbcode/react";
+import {ElementRenderer} from "xbbcode/renderer/base";
+import {Element} from "xbbcode/elements";
 
 const input = document.getElementsByClassName("input")[0] as HTMLInputElement;
 const output_bb = document.getElementsByClassName("output-bb")[0] as HTMLDivElement;
@@ -18,7 +18,17 @@ const output_html = document.getElementsByClassName("output-html")[0] as HTMLDiv
 const rendererText = new TextRenderer();
 const rendererBBCode = new BBCodeRenderer();
 const rendererReact = new ReactRenderer();
-const rendererHTML = new HTMLRenderer();
+const rendererHTML = new HTMLRenderer(rendererReact);
+
+rendererReact.registerCustomRenderer(new class extends ElementRenderer<Element, React.ReactNode> {
+    tags(): string | string[] {
+        return "bold";
+    }
+
+    render(element: Element): React.ReactNode {
+        return <b onClick={() => alert("Hello World")}>{rendererReact.renderContent(element)}</b>;
+    }
+});
 
 input.onchange = () => {
     const text = input.value;

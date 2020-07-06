@@ -14,6 +14,14 @@ export abstract class Renderer<T> {
         return renderer ? renderer.render(element) : this.renderDefault(element);
     }
 
+    public renderContent(element: Element, skipCustomRenderers?: boolean) : T[] {
+        if(element instanceof TagElement)
+            return element.content.map(e => skipCustomRenderers ? this.renderDefault(e) : this.render(e));
+
+        /* text nodes can only be default rendered */
+        return [this.renderDefault(element)];
+    }
+
     protected abstract renderDefault(element: Element) : T;
 
     getTextRenderer() : ElementRenderer<TextElement, T> | undefined {
@@ -24,8 +32,9 @@ export abstract class Renderer<T> {
         this.textRenderer = renderer;
     }
 
-    registerCustomRenderer(tag: string, renderer: ElementRenderer<Element, T>) {
-        this.knownRenderer[tag] = renderer;
+    registerCustomRenderer(renderer: ElementRenderer<Element, T>) {
+        const tags = renderer.tags();
+        (Array.isArray(tags) ? tags : [tags]).forEach(tag => this.knownRenderer[tag] = renderer);
     }
 
     deleteCustomRenderer(tag: string) {
