@@ -39,6 +39,25 @@ function test() {
 
 Some inline [icode]code[/icode] is this
 
+[table]
+[tr]
+[th]Name[/th]
+[th]Age[/th]
+[/tr]
+[tr]
+[td]John[/td]
+[td]65[/td]
+[/tr]
+[tr]
+[td]Gitte[/td]
+[td]40[/td]
+[/tr]
+[tr]
+[td]Sussie[/td]
+[td]19[/td]
+[/tr]
+[/table]
+
 [i]Italic[/i]
 [u]Underlined[/u]
 [s]Strike though[/s]

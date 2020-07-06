@@ -32,30 +32,6 @@ export class TagElement implements Element {
 
     }
 
-    /*
-    build_text(): string {
-        if(!this.tagType)
-            throw "tag not text buildable!";
-
-        if(this.parser.build_text)
-            return this.parser.build_text(this);
-        return this.parser.build_text_tag_open(this) + this.content.map(e => e.build_text()).join("") + this.parser.build_text_tag_close(this);
-    }
-
-    build_bbcode(): string {
-        return "[" + this.tag + (this.options ? "=" + this.options : "") + "]" + this.content.map(e => e.build_bbcode()).join("") + "[/" + this.tag + "]";
-    }
-
-    build_html(): string {
-        if(!this.parser)
-            throw "tag (" + this.tag + ") not html buildable!";
-
-        if(this.parser.build_html)
-            return this.parser.build_html(this);
-        return this.parser.build_html_tag_open(this) + this.content.map(e => e.build_html()).join("") + this.parser.build_html_tag_close(this);
-    }
-    */
-
     /* the case of: [HelloWorld] */
     deductibleAsText() : boolean {
         return this.content.length == 0 && !this.properlyClosed;

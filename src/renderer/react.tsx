@@ -8,7 +8,7 @@ const cssStyle = require("./react.scss");
 const cssClassName = tag => "xbbcode-tag xbbcode-tag-" + tag + " " + cssStyle.tag;
 
 const textRenderer = new TextRenderer();
-const TagRenderer: {[key: string]: (tag: TagElement, renderContent: () => React.ReactNode[]) => React.ReactNode} = {};
+const TagRenderer: {[key: string]: (tag: TagElement, renderContent: () => React.ReactNode[], renderer: Renderer<React.ReactNode>) => React.ReactNode} = {};
 
 let reactKeyId = 0;
 export default class extends Renderer<React.ReactNode> {
@@ -30,33 +30,20 @@ export default class extends Renderer<React.ReactNode> {
 
     private renderTag(tag: TagElement, depth: number) : React.ReactNode {
         if(typeof TagRenderer[tag.tagType?.tag] === "function")
-            return TagRenderer[tag.tagType?.tag](tag, () => tag.content.map(e => this.doRender(e, depth + 1)));
+            return TagRenderer[tag.tagType?.tag](tag, () => tag.content.map(e => this.doRender(e, depth + 1)), this);
 
         return <span key={++reactKeyId} className={cssClassName("text")}>&lt;!-- unknown tag {tag.tagType?.tag || tag.tag} --&gt;</span>;
     }
 
     private renderText(text: TextElement) : React.ReactNode {
-        const rawText = text.text();
-
-        let lines = rawText.split("\n");
-        if(lines.findIndex(e => e.length !== 0) === -1)
-            return lines.slice(1).map(() => <br key={++reactKeyId} />);
-
-        return <span key={++reactKeyId} className={cssClassName("text")} dangerouslySetInnerHTML={{ __html: textToHTMLContent(rawText, false) }} />;
+        return textToReactChildren(text.text(), false);
     }
 }
 
-const textToHTMLContent = (tag: Element | string, stripEmptyLines: boolean) => {
-    const rawText = typeof tag === "string" ? tag : textRenderer.render(tag);
-    const saveText = rawText.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const textToReactChildren = (text: string, stripLeadingAnTailingEmptyLines: boolean) => {
+    let lines = text.split("\n");
 
-    let lines = saveText.split("\n");
-
-    /* in case of only new lines */
-    if(lines.findIndex(e => e.length !== 0) === -1)
-        return lines.join("<br/>");
-
-    if(lines.length > 1 && stripEmptyLines) {
+    if(lines.length > 1 && stripLeadingAnTailingEmptyLines) {
         if(lines[0].length === 0)
             lines = lines.slice(1);
 
@@ -64,23 +51,17 @@ const textToHTMLContent = (tag: Element | string, stripEmptyLines: boolean) => {
             lines = lines.slice(0, lines.length - 1);
     }
 
-    return lines.map(e => {
-        /* replace start spaces */
-        let startSpaceCount = 0;
-        while(startSpaceCount < e.length && e.charAt(startSpaceCount) === ' ')
-            startSpaceCount++;
+    const children = [];
+    for(let index = 0; index < lines.length; index++) {
+        if(index > 0)
+            children.push(<br key={++reactKeyId} />);
 
-        if(startSpaceCount === e.length)
-            return "";
+        if(lines[index].length > 0)
+            children.push(<React.Fragment key={++reactKeyId}>{lines[index]}</React.Fragment>);
+    }
 
-        let result = "";
-        for(let i = 0; i < startSpaceCount; i++)
-            result += "&nbsp;";
-
-        return result + e.substr(startSpaceCount);
-    }).join("<br/>");
+    return children;
 };
-
 const RenderElement = (props: { element: Element, renderer: Renderer<React.ReactNode> }) => props.renderer.render(props.element) as any;
 
 TagRenderer[undefined as any] = tag => {
@@ -91,14 +72,14 @@ TagRenderer[undefined as any] = tag => {
     return openTag + tag.content.map(this.renderDefault.bind(this)) + "[/" + tag.tag + "]";
 };
 
-TagRenderer["no-parse"] = tag => <span key={++reactKeyId} dangerouslySetInnerHTML={{ __html: textToHTMLContent(tag, true) }} />;
+TagRenderer["no-parse"] = tag => textToReactChildren(textRenderer.render(tag), true);
 
 TagRenderer["center"] = (tag, renderContent) => <span key={++reactKeyId} className={cssClassName("center")}>{renderContent()}</span>;
 TagRenderer["right"] = (tag, renderContent) => <span key={++reactKeyId} className={cssClassName("right")}>{renderContent()}</span>;
 TagRenderer["left"] = (tag, renderContent) => <span key={++reactKeyId} className={cssClassName("left")}>{renderContent()}</span>;
 
-TagRenderer["code"] = tag => <code key={++reactKeyId} className={cssClassName("code")} x-code-type={tag.options} dangerouslySetInnerHTML={{ __html: textToHTMLContent(tag, true) }} />;
-TagRenderer["i-code"] = tag => <code key={++reactKeyId} className={cssClassName("inline-code")} x-code-type={tag.options} dangerouslySetInnerHTML={{ __html: textToHTMLContent(tag, true) }} />;
+TagRenderer["code"] = tag => <code key={++reactKeyId} className={cssClassName("code")} x-code-type={tag.options}>{textToReactChildren(textRenderer.render(tag), true)}</code>;
+TagRenderer["i-code"] = tag => <code key={++reactKeyId} className={cssClassName("inline-code")} x-code-type={tag.options}>{textToReactChildren(textRenderer.render(tag), true)}</code>;
 
 const regexColorName = /^(?:aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|black|blanchedalmond|blue|blueviolet|brown|burlywood|cadetblue|chartreuse|chocolate|coral|cornflowerblue|cornsilk|crimson|cyan|darkblue|darkcyan|darkgoldenrod|darkgray|darkgreen|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|darkred|darksalmon|darkseagreen|darkslateblue|darkslategray|darkturquoise|darkviolet|deeppink|deepskyblue|dimgray|dodgerblue|firebrick|floralwhite|forestgreen|fuchsia|gainsboro|ghostwhite|gold|goldenrod|gray|green|greenyellow|honeydew|hotpink|indianred|indigo|ivory|khaki|lavender|lavenderblush|lawngreen|lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|lightgray|lightgreen|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategray|lightsteelblue|lightyellow|lime|limegreen|linen|magenta|maroon|mediumaquamarine|mediumblue|mediumorchid|mediumpurple|mediumseagreen|mediumslateblue|mediumspringgreen|mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|moccasin|navajowhite|navy|oldlace|olive|olivedrab|orange|orangered|orchid|palegoldenrod|palegreen|paleturquoise|palevioletred|papayawhip|peachpuff|peru|pink|plum|powderblue|purple|red|rosybrown|royalblue|saddlebrown|salmon|sandybrown|seagreen|seashell|sienna|silver|skyblue|slateblue|slategray|snow|springgreen|steelblue|tan|teal|thistle|tomato|turquoise|violet|wheat|white|whitesmoke|yellow|yellowgreen)$/g;
 const regexColorValue = /^#?([a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/g;
@@ -194,13 +175,87 @@ TagRenderer["unordered-list"] = (tag, renderContent) => <ul key={++reactKeyId} c
 TagRenderer["li"] = (tag, renderContent) => <li key={++reactKeyId}>{renderContent()}</li>;
 
 /* TODO: Table! */
+const alignments = {
+    "center": "center",
+    "c": "center",
+
+    "left": "left",
+    "l": "left",
+
+    "right": "right",
+    "r": "right"
+};
+
+TagRenderer["table"] = (tag, _, renderer) => {
+    const rowsTable = tag.content.filter(e => e instanceof TagElement && e.tagNormalized === "tr").map(e => e as TagElement);
+    const rowHeader = rowsTable.find(e => e.content.find(e => e instanceof TagElement && e.tagNormalized === "th") !== undefined);
+    const rowsBody = rowsTable.filter(e => e !== rowHeader);
+
+    let renderedHeader = undefined;
+    let renderedBody = [];
+    if(rowHeader) {
+        //Apply style from the header to the full column
+        const columnStyles = rowHeader.content.filter(e => e instanceof TagElement).map(e => e as TagElement).map(e => {
+            const style = e.options || "left";
+            e.options = undefined;
+            return style;
+        });
+
+        for(const row of rowsTable) {
+            const columns = row.content.filter(e => e instanceof TagElement).map(e => e as TagElement);
+            if(columns.length == 0) continue;
+            if(columns[0].tagNormalized === "th") continue;
+
+            columns.forEach((column, index) => {
+                if(index < columnStyles.length)
+                    column.options = column.options || columnStyles[index];
+            });
+        }
+
+        const renderedRow = [];
+        for(const column of rowHeader.content) {
+            if(!(column instanceof TagElement))
+                continue;
+
+            renderedRow.push(<th key={++reactKeyId} style={{ textAlign: alignments[column.options] }}>{renderer.render(column)}</th>);
+        }
+
+        renderedHeader = <tr key={++reactKeyId}>{renderedRow}</tr>;
+    }
+
+    for(const bodyRow of rowsBody) {
+        const renderedRow = [];
+        for(const column of bodyRow.content) {
+            if(!(column instanceof TagElement))
+                continue;
+
+            renderedRow.push(<td key={++reactKeyId} style={{ textAlign: alignments[column.options] }}>{renderer.render(column)}</td>);
+        }
+
+        renderedBody.push(<tr key={++reactKeyId}>{renderedRow}</tr>);
+    }
+
+    return <table key={++reactKeyId} className={cssClassName("table")}>
+        {renderedHeader ? <thead key={++reactKeyId}>{renderedHeader}</thead> : undefined}
+        <tbody key={++reactKeyId}>{renderedBody}</tbody>
+    </table>;
+};
+TagRenderer["table-row"] = (tag, renderContent) => {
+    const alignment = alignments[(tag.options || "").toLowerCase()];
+    return <tr key={++reactKeyId} style={{ textAlign: alignment }}>{renderContent()}</tr>;
+};
+
+/* the container (th; tr; td) are already rendered */
+TagRenderer["table-row"] = (tag, renderContent) => renderContent();
+TagRenderer["table-head"] = (tag, renderContent) => renderContent();
+TagRenderer["td"] = (tag, renderContent) => renderContent();
 
 const patternYtVideoId = /^(?:http(?:s)?:\/\/)?(?:www\.)?(?:m\.)?(?:youtu\.be\/|youtube\.com\/(?:(?:watch)?\?(?:.*&)?v(?:i)?=|(?:embed|v|vi|user)\/))([^?&"'>]{10,11})$/;
-TagRenderer["youtube"] = (tag, renderContent) => {
+TagRenderer["youtube"] = (tag, renderContent, renderer) => {
     const text = textRenderer.render(tag);
     const result = text.match(patternYtVideoId);
     if(!result || !result[1])
-        return TagRenderer["url"](tag, renderContent);
+        return TagRenderer["url"](tag, renderContent, renderer);
 
     return <iframe key={++reactKeyId} className={cssClassName("video")} src={"https://www.youtube.com/embed/" + result[1]} frameBorder={0} allow="autoplay; encrypted-media" allowFullScreen={true} />;
 };

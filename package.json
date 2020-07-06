@@ -4,7 +4,7 @@
   "description": "XBBCode is a power full BBCode parser and render library written in JavaScript.",
   "scripts": {
     "test": "echo \\\"Error: no demo specified\\\" && exit 1",
-    "start": "webpack --config webpack.config.js",
+    "start": "webpack --config webpack-demo.config.js",
     "build": "tsc -p tsconfig.json"
   },
   "files": [
