@@ -1,0 +1,31 @@
+{
+  "name": "exbbcode",
+  "version": "1.1.1",
+  "description": "XBBCode is a power full BBCode parser and render library written in JavaScript.",
+  "scripts": {
+    "test": "echo \\\"Error: no demo specified\\\" && exit 1",
+    "start": "webpack --config webpack.config.js",
+    "build": "tsc -p tsconfig.json"
+  },
+  "files": [
+    "dist-lib/**/*"
+  ],
+  "main": "./dist-lib/",
+  "author": "Markus Hadenfeldt",
+  "license": "MIT",
+  "devDependencies": {
+    "webpack": "^4.43.0",
+    "webpack-cli": "^3.3.12",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1",
+    "css-loader": "^3.6.0",
+    "sass": "^1.26.9",
+    "sass-loader": "^9.0.1",
+    "style-loader": "^1.2.1",
+    "ts-loader": "^7.0.5",
+    "typescript": "^3.9.6"
+  },
+  "peerDependencies": {
+    "react": "^16.0.0"
+  }
+}

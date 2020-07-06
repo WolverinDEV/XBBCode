@@ -1,20 +1,29 @@
-# XBBCode parser
+# eXBBCode parser
+Your extendable, fast and reliable BB-Code parser and renderer for JavaScript.  
 
 ## Attention
-Do not use the HTML output without verify it!  
-Its highly recommended to send it throw DOMPurify!
+~~Do not use the HTML output without verify it!  
+Its highly recommended to send it throw DOMPurify!~~
+Since we're using React instead of building a HTML string we've no need for this anymore!
 
 ## Test code
 ```bbcode
+[b]Hello <> \\\\[font=arial]:_D[/font] [url=https://google.de]World[/] [hr] [color=FF00FFFF]Second line [/b]
+ s dsdsdsdsdsds sddddd asdasdasd :D Hello World
+
+
+
 [color=red]this should be red[/color]
 [color=FFFF00]this should be yellow[/color]
 [color=0000FF99]this should be blue with transparency[/color]
+
+[url][color=red]teaspeak.de[/url]
 
 [no-parse][b] this is a bbcode [/b][/no-parse]
 [b]this is actiually bold[/b]
 
 [c] This text is centered [/c]
-[r] This text is right aligned [/r]
+[r] This text is right aligned     [/r]
 [bgcolor=red][c] Left text [l] This test is left aligned [/l][/c][/bgcolor]
 
 [size=9]Big Text[/size]
@@ -56,5 +65,8 @@ Added a no parse here to avoid image loading
 [/olist]
 
 <hr>
+<script>alert(1);</script>
+
+[noparse][yt]https://www.youtube.com/watch?v=TLci6ErUugM[/yt]
 ```
 

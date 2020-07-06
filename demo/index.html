@@ -42,9 +42,6 @@
                 margin: 20px 20px 5px;
             }
         </style>
-
-        <link rel="stylesheet" type="text/css" href="../src/xbbcode.css">
-        <script src="../src/parser.js"></script>
     </head>
     <body>
         <div class="container-input">
@@ -59,34 +56,6 @@
             <div class="output-html"></div>
         </div>
 
-        <script type="application/javascript">
-            const input = document.getElementsByClassName("input")[0];
-            const output_bb = document.getElementsByClassName("output-bb")[0];
-            const output_text = document.getElementsByClassName("output-text")[0];
-            const output_html = document.getElementsByClassName("output-html")[0];
-
-            input.onchange = () => {
-                const text = input.value;
-                localStorage.setItem("text", text);
-
-                const result = xbbcode.parse(text, {
-                    /*
-                    tag_whitelist: ['b'],
-                    enforce_back_whitelist: false
-                    */
-                    tag_blacklist: [],
-                    verbose: true
-                });
-
-                output_bb.innerText = result.root_tag.content.map(e => e.build_bbcode()).join("");
-                output_text.innerText = result.root_tag.content.map(e => e.build_text()).join("");
-                output_html.innerHTML = result.root_tag.content.map(e => e.build_html()).join("");
-                console.log("Change!");
-            };
-            input.onkeyup = input.onchange;
-
-            input.textContent = localStorage.getItem("text");
-            input.onkeyup();
-        </script>
+        <script src="../dist/demo.js"></script>
     </body>
 </html>
