@@ -1,6 +1,6 @@
 import * as React from "react";
-import {Options, parse} from "xbbcode/parser";
-import ReactRenderer from "xbbcode/renderer/react";
+import {Options, parse} from "./parser";
+import ReactRenderer from "./renderer/react";
 
 const defaultRenderer = new ReactRenderer();
 

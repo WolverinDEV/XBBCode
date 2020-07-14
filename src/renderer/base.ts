@@ -4,14 +4,14 @@ export abstract class Renderer<T> {
     private textRenderer: ElementRenderer<TextElement, T> | undefined;
     private knownRenderer: {[key: string]: ElementRenderer<Element, T>} = {};
 
-    public render(element: Element) : T {
+    public render(element: Element, skipCustomRenderers?: boolean) : T {
         let renderer: ElementRenderer<Element, T>;
         if(element instanceof TextElement)
             renderer = this.textRenderer;
         else if(element instanceof TagElement)
             renderer = this.knownRenderer[element.tagType?.tag];
 
-        return renderer ? renderer.render(element) : this.renderDefault(element);
+        return renderer && !skipCustomRenderers ? renderer.render(element, this) : this.renderDefault(element);
     }
 
     public renderContent(element: Element, skipCustomRenderers?: boolean) : T[] {
@@ -32,7 +32,7 @@ export abstract class Renderer<T> {
         this.textRenderer = renderer;
     }
 
-    registerCustomRenderer(renderer: ElementRenderer<Element, T>) {
+    registerCustomRenderer(renderer: ElementRenderer<TagElement, T>) {
         const tags = renderer.tags();
         (Array.isArray(tags) ? tags : [tags]).forEach(tag => this.knownRenderer[tag] = renderer);
     }
@@ -45,14 +45,14 @@ export abstract class Renderer<T> {
         return Object.keys(this.knownRenderer);
     }
 
-    getCustomRenderer(key: string) : ElementRenderer<Element, T> | undefined {
+    getCustomRenderer(key: string) : ElementRenderer<TagElement, T> | undefined {
         return this.knownRenderer[key];
     }
 }
 
-export abstract class ElementRenderer<E extends Element, T> {
+export abstract class ElementRenderer<E extends Element, T, R extends Renderer<T> = Renderer<T>> {
     abstract tags() : string | string[]; /* which tags etc should be rendered */
-    abstract render(element: E) : T;
+    abstract render(element: E, renderer: R) : T;
 }
 
 export abstract class StringRenderer extends Renderer<string> {

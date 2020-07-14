@@ -107,4 +107,25 @@
             content: " "; /* hide the br, because the video is already a block */
         }
     }
+
+    &.xbbcode-tag-quote {
+        display: block;
+
+        margin-left: .2em;
+        margin-bottom: .2em;
+        margin-top: .2em;
+
+        padding: 0 1em;
+
+        color: #6a737d;
+        border-left: .25em solid #dfe2e5;
+
+        br:first-child, br:last-child {
+            display: none;
+        }
+
+        & + br {
+            content: " "; /* hide the br, because the video is already a block */
+        }
+    }
 }

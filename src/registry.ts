@@ -70,8 +70,7 @@ Default.registerTag({ tag: "size" });
 Default.registerTag({ tag: "url" });
 Default.registerTag({ tag: "img" });
 
-/* FIXME! */
-//Default.registerTag({ tag: "quote" });
+Default.registerTag({ tag: "quote" });
 
 Default.registerTag({ tag: "sub" });
 Default.registerTag({ tag: "sup" });

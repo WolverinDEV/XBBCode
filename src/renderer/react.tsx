@@ -1,17 +1,17 @@
 import * as React from "react";
-import {Renderer} from "xbbcode/renderer/base";
-import TextRenderer from "xbbcode/renderer/text";
-import {Element, TagElement, TextElement} from "xbbcode/elements";
-import * as TagRegistry from "xbbcode/registry";
+import {Renderer} from "./base";
+import TextRenderer from "./text";
+import {Element, TagElement, TextElement} from "../elements";
+import * as TagRegistry from "../registry";
 
 const cssStyle = require("./react.scss");
 const cssClassName = tag => "xbbcode-tag xbbcode-tag-" + tag + " " + cssStyle.tag;
 
 const textRenderer = new TextRenderer();
-const TagRenderer: {[key: string]: (tag: TagElement, renderContent: () => React.ReactNode[], renderer: Renderer<React.ReactNode>) => React.ReactNode} = {};
+const TagRenderer: {[key: string]: (tag: TagElement, renderContent: () => React.ReactNode[], renderer: ReactRenderer) => React.ReactNode} = {};
 
 let reactKeyId = 0;
-export default class extends Renderer<React.ReactNode> {
+export default class ReactRenderer extends Renderer<React.ReactNode> {
     protected renderDefault(element: Element): React.ReactNode {
         return this.doRender(element, 0);
     };
@@ -36,33 +36,38 @@ export default class extends Renderer<React.ReactNode> {
     }
 
     private renderText(text: TextElement) : React.ReactNode {
-        return textToReactChildren(text.text(), false);
+        return this.renderAsText(text.text(), false);
+    }
+
+    renderAsText(element: Element | string, stripLeadingAnTailingEmptyLines: boolean) : React.ReactNode {
+        const text = typeof element === "string" ? element : textRenderer.render(element);
+        let lines = text.split("\n");
+
+        if(lines.length > 1 && stripLeadingAnTailingEmptyLines) {
+            if(lines[0].length === 0)
+                lines = lines.slice(1);
+
+            if(lines[lines.length - 1]?.length === 0)
+                lines = lines.slice(0, lines.length - 1);
+        }
+
+        const children = [];
+        for(let index = 0; index < lines.length; index++) {
+            if(index > 0)
+                children.push(<br key={++reactKeyId} />);
+
+            if(lines[index].length > 0)
+                children.push(<React.Fragment key={++reactKeyId}>{lines[index]}</React.Fragment>);
+        }
+
+        return children;
+    }
+
+    renderContentAsText(element: TagElement, stripLeadingAnTailingEmptyLines: boolean) : React.ReactNode {
+        return this.renderAsText(textRenderer.renderContent(element).join(""), stripLeadingAnTailingEmptyLines);
     }
 }
-
-const textToReactChildren = (text: string, stripLeadingAnTailingEmptyLines: boolean) => {
-    let lines = text.split("\n");
-
-    if(lines.length > 1 && stripLeadingAnTailingEmptyLines) {
-        if(lines[0].length === 0)
-            lines = lines.slice(1);
-
-        if(lines[lines.length - 1]?.length === 0)
-            lines = lines.slice(0, lines.length - 1);
-    }
-
-    const children = [];
-    for(let index = 0; index < lines.length; index++) {
-        if(index > 0)
-            children.push(<br key={++reactKeyId} />);
-
-        if(lines[index].length > 0)
-            children.push(<React.Fragment key={++reactKeyId}>{lines[index]}</React.Fragment>);
-    }
-
-    return children;
-};
-const RenderElement = (props: { element: Element, renderer: Renderer<React.ReactNode> }) => props.renderer.render(props.element) as any;
+const RenderElement = (props: { element: Element, renderer: ReactRenderer }) => props.renderer.render(props.element) as any;
 
 TagRenderer[undefined as any] = tag => {
     const openTag = "[" + tag.tag + (tag.options ? "=" + tag.options : "") + "]";
@@ -72,14 +77,14 @@ TagRenderer[undefined as any] = tag => {
     return openTag + tag.content.map(this.renderDefault.bind(this)) + "[/" + tag.tag + "]";
 };
 
-TagRenderer["no-parse"] = tag => textToReactChildren(textRenderer.render(tag), true);
+TagRenderer["no-parse"] = (tag, _, renderer) => renderer.renderAsText(textRenderer.render(tag), true);
 
 TagRenderer["center"] = (tag, renderContent) => <span key={++reactKeyId} className={cssClassName("center")}>{renderContent()}</span>;
 TagRenderer["right"] = (tag, renderContent) => <span key={++reactKeyId} className={cssClassName("right")}>{renderContent()}</span>;
 TagRenderer["left"] = (tag, renderContent) => <span key={++reactKeyId} className={cssClassName("left")}>{renderContent()}</span>;
 
-TagRenderer["code"] = tag => <code key={++reactKeyId} className={cssClassName("code")} x-code-type={tag.options}>{textToReactChildren(textRenderer.render(tag), true)}</code>;
-TagRenderer["i-code"] = tag => <code key={++reactKeyId} className={cssClassName("inline-code")} x-code-type={tag.options}>{textToReactChildren(textRenderer.render(tag), true)}</code>;
+TagRenderer["code"] = (tag, _, renderer) => <code key={++reactKeyId} className={cssClassName("code")} x-code-type={tag.options}>{renderer.renderAsText(textRenderer.render(tag), true)}</code>;
+TagRenderer["i-code"] = (tag, _, renderer) => <code key={++reactKeyId} className={cssClassName("inline-code")} x-code-type={tag.options}>{renderer.renderAsText(textRenderer.render(tag), true)}</code>;
 
 const regexColorName = /^(?:aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|black|blanchedalmond|blue|blueviolet|brown|burlywood|cadetblue|chartreuse|chocolate|coral|cornflowerblue|cornsilk|crimson|cyan|darkblue|darkcyan|darkgoldenrod|darkgray|darkgreen|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|darkred|darksalmon|darkseagreen|darkslateblue|darkslategray|darkturquoise|darkviolet|deeppink|deepskyblue|dimgray|dodgerblue|firebrick|floralwhite|forestgreen|fuchsia|gainsboro|ghostwhite|gold|goldenrod|gray|green|greenyellow|honeydew|hotpink|indianred|indigo|ivory|khaki|lavender|lavenderblush|lawngreen|lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|lightgray|lightgreen|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategray|lightsteelblue|lightyellow|lime|limegreen|linen|magenta|maroon|mediumaquamarine|mediumblue|mediumorchid|mediumpurple|mediumseagreen|mediumslateblue|mediumspringgreen|mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|moccasin|navajowhite|navy|oldlace|olive|olivedrab|orange|orangered|orchid|palegoldenrod|palegreen|paleturquoise|palevioletred|papayawhip|peachpuff|peru|pink|plum|powderblue|purple|red|rosybrown|royalblue|saddlebrown|salmon|sandybrown|seagreen|seashell|sienna|silver|skyblue|slateblue|slategray|snow|springgreen|steelblue|tan|teal|thistle|tomato|turquoise|violet|wheat|white|whitesmoke|yellow|yellowgreen)$/g;
 const regexColorValue = /^#?([a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/g;
@@ -258,6 +263,12 @@ TagRenderer["youtube"] = (tag, renderContent, renderer) => {
         return TagRenderer["url"](tag, renderContent, renderer);
 
     return <iframe key={++reactKeyId} className={cssClassName("video")} src={"https://www.youtube.com/embed/" + result[1]} frameBorder={0} allow="autoplay; encrypted-media" allowFullScreen={true} />;
+};
+
+TagRenderer["quote"] = (tag, renderContent) => {
+    return <blockquote key={++reactKeyId} className={cssClassName("quote")}>
+        {renderContent()}
+    </blockquote>
 };
 
 /* some testing */
