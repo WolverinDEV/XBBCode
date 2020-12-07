@@ -10,8 +10,9 @@ export default class extends StringRenderer {
                     return "\n";
 
                 default:
-                    if(element.deductibleAsText())
+                    if(element.deductibleAsText()) {
                         return element.deductAsText();
+                    }
 
                     return element.content;
             }

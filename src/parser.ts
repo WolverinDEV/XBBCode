@@ -7,6 +7,8 @@ export interface Options {
     maxDepth?: number;
     tagRegistry?: Registry.TagRegistry;
 
+    lazyCloseTag?: boolean;
+
     tag_blacklist?: string[] | undefined;
     tag_whitelist?: string[] | undefined;
 
@@ -19,12 +21,14 @@ function parseTag(text: string) : { tag: string, close: boolean, options?: strin
     const assign_index = text.indexOf('=');
     const close = text.length > 0 && text[0] == '/';
 
-    if(assign_index == -1)
+    if(assign_index == -1) {
         return {
             close: close,
             tag: text.substr(close ? 1 : 0),
             options: undefined
         };
+    }
+
     return {
         close: close,
         tag: text.substr(close ? 1 : 0, assign_index),
@@ -218,48 +222,52 @@ function doParse(text: string, options: Options) : TagElement {
             break;
         }
 
-        const raw_tag = text.substring(index, needle_index);
-        let ignore_tag = !raw_tag.match(tagPattern) && raw_tag != "/";
+        const rawTag = text.substring(index, needle_index);
+        let ignoreTag = !rawTag.match(tagPattern) && rawTag != "/";
 
-        parse_tag:
-        if(!ignore_tag) {
-            const tag = parseTag(raw_tag);
+        parseTag:
+        if(!ignoreTag) {
+            const tag = parseTag(rawTag);
             const parser = tag.tag ? options.tagRegistry.findTag(tag.tag.toLowerCase()) : undefined;
 
-            //TODO: Option if we want to support the "lazy" close tags: [/]
-            if(tag.tag && !parser) {
-                /* we dont want to parse tags which we dont known */
-                ignore_tag = true;
-                break parse_tag;
-            }
+            if(tag.tag || typeof options.lazyCloseTag !== "boolean" || !options.lazyCloseTag) {
+                if(!parser) {
+                    /* we dont want to parse tags which we dont known */
+                    ignoreTag = true;
+                    break parseTag;
+                }
 
-            black_white_check:
+                blackWhiteCheck:
                 if(!black_whitelist.accept_tag(tag.tag.toLowerCase())) {
                     /* we do not support this tag. Check if parse is null because if so we encountered a "lazy" close tag */
                     if(!parser) {
-                        ignore_tag = true;
-                        break parse_tag;
+                        ignoreTag = true;
+                        break parseTag;
                     }
 
-                    if(parser.ignore_black_whitelist && !options.enforce_back_whitelist)
-                        break black_white_check;
+                    if(parser.ignore_black_whitelist && !options.enforce_back_whitelist) {
+                        break blackWhiteCheck;
+                    }
 
                     /* test if this might be the close tag to the last open tag */
                     if(!(tag.close && (tag.tag.length == 0 || tag.tag.toLowerCase() == stack.back().tagNormalized))) {
-                        ignore_tag = true;
-                        break parse_tag;
+                        ignoreTag = true;
+                        break parseTag;
                     }
                 }
+            } else {
+                /* Any close tag: "[/]" */
+            }
 
             if(tag.close) {
-                const tag_normalized = tag.tag.toLowerCase();
-                let stack_index = stack.length;
-                while(--stack_index > 0) {
-                    if(stack[stack_index].tagNormalized == tag_normalized || tag_normalized.length == 0) {
-                        stack[stack_index].properlyClosed = true;
-                        stack[stack_index].textPosition.end = needle_index + 1;
+                const tagNormalized = tag.tag.toLowerCase();
+                let stackIndex = stack.length;
+                while(--stackIndex > 0) {
+                    if(stack[stackIndex].tagNormalized == tagNormalized || tagNormalized.length == 0) {
+                        stack[stackIndex].properlyClosed = true;
+                        stack[stackIndex].textPosition.end = needle_index + 1;
 
-                        while(stack.length > stack_index) {
+                        while(stack.length > stackIndex) {
                             const pos = fixStackStrings(stack.pop()).textPosition;
                             if(pos.end == -1)
                                 pos.end = index - 1; /* we want the brace start as end of the last text! */
@@ -267,14 +275,14 @@ function doParse(text: string, options: Options) : TagElement {
 
                         black_whitelist = buildTabBlackWhiteList(stack, options);
                         break;
-                    } else if(tag_normalized == '*' && isListTag(stack[stack_index].tagNormalized)) { /* fix double [/*] within inner lists changing outer behaviours */
+                    } else if(tagNormalized == '*' && isListTag(stack[stackIndex].tagNormalized)) { /* fix double [/*] within inner lists changing outer behaviours */
                         break;
                     }
                 }
-                if(stack_index == 0) {
+                if(stackIndex == 0) {
                     //TODO: Warn for invalid close
                     console.log("Invalid close!");
-                    ignore_tag = true;
+                    ignoreTag = true;
                 }
             } else {
                 const element = new TagElement(tag.tag, parser, tag.options);
@@ -298,7 +306,7 @@ function doParse(text: string, options: Options) : TagElement {
                     if(stack_index == 0) {
                         console.log("Invalid list handle!");
                         //TODO: Warn for no valid list handle
-                        ignore_tag = true;
+                        ignoreTag = true;
                     } else {
                         black_whitelist = buildTabBlackWhiteList(stack, options);
 
@@ -310,7 +318,7 @@ function doParse(text: string, options: Options) : TagElement {
                     }
                 }
 
-                if(!ignore_tag) {
+                if(!ignoreTag) {
                     stack.back().content.push(element);
 
                     if(!element.tagType?.instantClose) {
@@ -323,7 +331,7 @@ function doParse(text: string, options: Options) : TagElement {
             }
         }
 
-        if(ignore_tag) {
+        if(ignoreTag) {
             stack.back().content.push(new TextElement(text, escaped, index - 1, needle_index + 1));
             escaped = [];
             index = needle_index + 1;
@@ -356,29 +364,18 @@ function printStack(layer: Element, prefix?: string) {
 export function parse(text: string, options_: Options) : Element[] {
     const options = Object.assign({}, options_);
 
-    if(!options.tagRegistry)
+    if(!options.tagRegistry) {
         options.tagRegistry = Registry.Default;
+    }
 
-    if(!options.maxDepth)
+    if(!options.maxDepth) {
         options.maxDepth = 128;
+    }
 
     const result = doParse(text, options);
-    if(options.verbose)
+    if(options.verbose) {
         printStack(result);
+    }
 
     return result.content;
-    /*
-    return {
-        root_tag: result,
-        build_bbcode(): string {
-            return result.content.map(e => e.build_bbcode()).join("");
-        },
-        build_html(): string {
-            return result.content.map(e => e.build_html()).join("");
-        },
-        build_text(): string {
-            return result.content.map(e => e.build_text()).join("");
-        }
-    };
-    */
 }

@@ -44,20 +44,24 @@ export default class ReactRenderer extends Renderer<React.ReactNode> {
         let lines = text.split("\n");
 
         if(lines.length > 1 && stripLeadingAnTailingEmptyLines) {
-            if(lines[0].length === 0)
+            if(lines[0].length === 0) {
                 lines = lines.slice(1);
+            }
 
-            if(lines[lines.length - 1]?.length === 0)
+            if(lines[lines.length - 1]?.length === 0) {
                 lines = lines.slice(0, lines.length - 1);
+            }
         }
 
         const children = [];
         for(let index = 0; index < lines.length; index++) {
-            if(index > 0)
+            if(index > 0) {
                 children.push(<br key={++reactKeyId} />);
+            }
 
-            if(lines[index].length > 0)
+            if(lines[index].length > 0) {
                 children.push(<React.Fragment key={++reactKeyId}>{lines[index]}</React.Fragment>);
+            }
         }
 
         return children;

@@ -6,10 +6,11 @@ export abstract class Renderer<T> {
 
     public render(element: Element, skipCustomRenderers?: boolean) : T {
         let renderer: ElementRenderer<Element, T>;
-        if(element instanceof TextElement)
+        if(element instanceof TextElement) {
             renderer = this.textRenderer;
-        else if(element instanceof TagElement)
+        } else if(element instanceof TagElement) {
             renderer = this.knownRenderer[element.tagType?.tag];
+        }
 
         return renderer && !skipCustomRenderers ? renderer.render(element, this) : this.renderDefault(element);
     }
