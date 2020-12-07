@@ -176,8 +176,8 @@ TagRenderer["img"] = (tag) => {
 TagRenderer["sub"] = (tag, renderContent) => <sub key={++reactKeyId} className={cssClassName("sub")}>{renderContent()}</sub>;
 TagRenderer["sup"] = (tag, renderContent) => <sup key={++reactKeyId} className={cssClassName("sup")}>{renderContent()}</sup>;
 
-TagRenderer["br"] = () => <br key={++reactKeyId} />;
-TagRenderer["hr"] = () => <hr key={++reactKeyId} />;
+TagRenderer["br"] = () => <br key={++reactKeyId} className={cssClassName("br")} />;
+TagRenderer["hr"] = () => <hr key={++reactKeyId} className={cssClassName("hr")} />;
 
 TagRenderer["ordered-list"] = (tag, renderContent) => <ol key={++reactKeyId} className={cssClassName("list")} type={tag.options as any} >{renderContent()}</ol>;
 TagRenderer["unordered-list"] = (tag, renderContent) => <ul key={++reactKeyId} className={cssClassName("list")} >{renderContent()}</ul>;
