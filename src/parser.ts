@@ -81,12 +81,12 @@ function buildTabBlackWhiteList(stack: TagElement[], options: Options) : BlackWh
         if(typeof tagType === "undefined")
             continue;
 
-        if(typeof(tagType.content_tags_blacklist) !== "undefined") {
-            for(const blacklist_entry of tagType.content_tags_blacklist) {
-                if(blacklist_entry.overridden_by) {
+        if(typeof(tagType.blacklistTags) !== "undefined") {
+            for(const blacklist_entry of tagType.blacklistTags) {
+                if(blacklist_entry.overriddenBy) {
                     let flag_overridden = false;
                     for(let chk_index = index + 1; chk_index < stack.length; chk_index++) {
-                        if(blacklist_entry.overridden_by.findIndex(e => e == stack[chk_index].tagNormalized) != -1) {
+                        if(blacklist_entry.overriddenBy.findIndex(e => e == stack[chk_index].tagNormalized) != -1) {
                             flag_overridden = true;
                             break;
                         }
@@ -100,11 +100,11 @@ function buildTabBlackWhiteList(stack: TagElement[], options: Options) : BlackWh
             }
         }
 
-        if(typeof(tagType.content_tags_whitelist) !== "undefined") {
+        if(typeof(tagType.whitelistTags) !== "undefined") {
             if(typeof(whitelist) === "undefined")
-                whitelist = tagType.content_tags_whitelist;
+                whitelist = tagType.whitelistTags;
             else {
-                whitelist = whitelist.filter(e => tagType.content_tags_whitelist.findIndex(c => c == e) != -1);
+                whitelist = whitelist.filter(e => tagType.whitelistTags.findIndex(c => c == e) != -1);
             }
         }
     }
