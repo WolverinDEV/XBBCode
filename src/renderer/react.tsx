@@ -17,20 +17,26 @@ export default class ReactRenderer extends Renderer<React.ReactNode> {
     };
 
     private doRender(element: Element, depth: number): React.ReactNode {
-        if(depth > 16)
+        if(depth > 16) {
             return <RenderElement key={++reactKeyId} element={element} renderer={this} />;
+        }
 
-        if(element instanceof TagElement)
+        if(element instanceof TagElement) {
             return this.renderTag(element, depth);
-        else if(element instanceof TextElement)
+        } else if(element instanceof TextElement) {
             return this.renderText(element);
+        }
 
         return "<-- invalid node -->";
     };
 
     private renderTag(tag: TagElement, depth: number) : React.ReactNode {
-        if(typeof TagRenderer[tag.tagType?.tag] === "function")
+        const renderer = this.getCustomRenderer(tag.tagType?.tag);
+        if(renderer) {
+            return renderer.render(tag, this);
+        } else if(typeof TagRenderer[tag.tagType?.tag] === "function") {
             return TagRenderer[tag.tagType?.tag](tag, () => tag.content.map(e => this.doRender(e, depth + 1)), this);
+        }
 
         return <span key={++reactKeyId} className={cssClassName("text")}>&lt;!-- unknown tag {tag.tagType?.tag || tag.tag} --&gt;</span>;
     }
@@ -244,10 +250,12 @@ TagRenderer["table"] = (tag, _, renderer) => {
         renderedBody.push(<tr key={++reactKeyId}>{renderedRow}</tr>);
     }
 
-    return <table key={++reactKeyId} className={cssClassName("table")}>
-        {renderedHeader ? <thead key={++reactKeyId}>{renderedHeader}</thead> : undefined}
-        <tbody key={++reactKeyId}>{renderedBody}</tbody>
-    </table>;
+    return (
+        <table key={++reactKeyId} className={cssClassName("table")}>
+            {renderedHeader ? <thead key={++reactKeyId}>{renderedHeader}</thead> : undefined}
+            <tbody key={++reactKeyId}>{renderedBody}</tbody>
+        </table>
+    );
 };
 TagRenderer["table-row"] = (tag, renderContent) => {
     const alignment = alignments[(tag.options || "").toLowerCase()];
