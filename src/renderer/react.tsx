@@ -12,6 +12,14 @@ const TagRenderer: {[key: string]: (tag: TagElement, renderContent: () => React.
 
 let reactKeyId = 0;
 export default class ReactRenderer extends Renderer<React.ReactNode> {
+    private readonly encapsulateText: boolean;
+
+    constructor(encapsulateText: boolean = false) {
+        super();
+
+        this.encapsulateText = encapsulateText;
+    }
+
     protected renderDefault(element: Element): React.ReactNode {
         return this.doRender(element, 0);
     };
@@ -70,7 +78,11 @@ export default class ReactRenderer extends Renderer<React.ReactNode> {
             }
         }
 
-        return children;
+        if(this.encapsulateText) {
+            return <span key={++reactKeyId}>{children}</span>;
+        } else {
+            return children;
+        }
     }
 
     renderContentAsText(element: TagElement, stripLeadingAnTailingEmptyLines: boolean) : React.ReactNode {
