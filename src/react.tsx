@@ -10,8 +10,8 @@ export function XBBCodeRenderer(props: { text: string, children: never, options?
 export function XBBCodeRenderer(props: { text?: string, children: string | never, options?: Options, renderer?: ReactRenderer }) {
     try {
         const elements = parse(props.text || props.children, props.options);
-        return <>{elements.map(e => (props.renderer || defaultRenderer).render(e))}</>;
+        return <React.Fragment key={"success"}>{elements.map(e => (props.renderer || defaultRenderer).render(e))}</React.Fragment>;
     } catch (error) {
-        return <>{error}</>
+        return <React.Fragment key={error}>{error}</React.Fragment>
     }
 }
