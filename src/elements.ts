@@ -1,16 +1,16 @@
-import {Tag} from "./registry";
+import {BBCodeTag} from "./registry";
 
 export type TextPosition = {
     start: number,
     end: number
 };
 
-export interface Element {
+export interface BBCodeElement {
     textPosition : TextPosition;
 }
 
-export class TagElement implements Element {
-    tagType: Tag | undefined; /* the type of the tag, might be null if we don't know the tag */
+export class BBCodeTagElement implements BBCodeElement {
+    tagType: BBCodeTag | undefined; /* the type of the tag, might be null if we don't know the tag */
 
     tag: string; /* the tag actually parsed */
     tagNormalized: string; /* just the lowercase string */
@@ -19,9 +19,9 @@ export class TagElement implements Element {
     properlyClosed: boolean;
 
     options: string;
-    content: Element[];
+    content: BBCodeElement[];
 
-    constructor(tag: string, tagType: Tag | undefined, options?: string, content?: Element[]) {
+    constructor(tag: string, tagType: BBCodeTag | undefined, options?: string, content?: BBCodeElement[]) {
         this.tagType = tagType;
         this.tag = tag;
         this.tagNormalized = this.tag.toLowerCase();
@@ -42,7 +42,7 @@ export class TagElement implements Element {
     }
 }
 
-export class TextElement implements Element {
+export class BBCodeTextElement implements BBCodeElement {
     rawText: string;
     escapeCharacters: number[];
 
@@ -65,12 +65,14 @@ export class TextElement implements Element {
     }
 
     text() : string {
-        if(!this.escapeCharacters)
+        if(!this.escapeCharacters.length) {
             return this.rawText;
+        }
 
         let text = this.rawText;
-        for(const index of this.escapeCharacters)
+        for(const index of this.escapeCharacters) {
             text = text.substring(0, index) + text.substring(index + 1);
+        }
         return text;
     }
 }

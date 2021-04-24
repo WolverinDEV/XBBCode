@@ -1,31 +1,23 @@
 import * as ReactDOM from "react-dom";
 import * as React from "react";
-
-import { parse as parseBBCode } from "xbbcode/parser";
-
-import TextRenderer from "xbbcode/renderer/text";
-import BBCodeRenderer from "xbbcode/renderer/bbcode";
-import ReactRenderer from "xbbcode/renderer/react";
-import HTMLRenderer from "xbbcode/renderer/html";
-import {ElementRenderer} from "xbbcode/renderer/base";
-import {Element} from "xbbcode/elements";
+import {BBCodeElement, parseBBCode, renderer} from "xbbcode";
 
 const input = document.getElementsByClassName("input")[0] as HTMLInputElement;
 const output_bb = document.getElementsByClassName("output-bb")[0] as HTMLDivElement;
 const output_text = document.getElementsByClassName("output-text")[0] as HTMLDivElement;
 const output_html = document.getElementsByClassName("output-html")[0] as HTMLDivElement;
 
-const rendererText = new TextRenderer();
-const rendererBBCode = new BBCodeRenderer();
-const rendererReact = new ReactRenderer();
-const rendererHTML = new HTMLRenderer(rendererReact);
+const rendererText = new renderer.TextRenderer();
+const rendererBBCode = new renderer.BBCodeRenderer();
+const rendererReact = new renderer.ReactRenderer();
+const rendererHTML = new renderer.HTMLRenderer(rendererReact);
 
-rendererReact.registerCustomRenderer(new class extends ElementRenderer<Element, React.ReactNode> {
+rendererReact.registerCustomRenderer(new class extends renderer.ElementRenderer<BBCodeElement, React.ReactNode> {
     tags(): string | string[] {
         return "bold";
     }
 
-    render(element: Element): React.ReactNode {
+    render(element: BBCodeElement): React.ReactNode {
         return <b onClick={() => alert("Hello World")}>{rendererReact.renderContent(element)}</b>;
     }
 });

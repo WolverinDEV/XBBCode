@@ -1,4 +1,4 @@
-import {Element} from "../elements";
+import {BBCodeElement} from "../elements";
 import {Renderer} from "./base";
 import ReactRenderer from "./react";
 
@@ -14,7 +14,7 @@ export default class extends Renderer<string> {
         this.reactRenderer = reactRenderer;
     }
 
-    protected renderDefault(element: Element): string {
+    protected renderDefault(element: BBCodeElement): string {
         const result = (this.reactRenderer || reactRenderer).render(element);
 
         const stringify = (element: React.ReactNode) => {

@@ -1,15 +1,15 @@
 import * as React from "react";
-import {Options, parse} from "./parser";
+import {ParseOptions, parseBBCode} from "./parser";
 import ReactRenderer from "./renderer/react";
 
 let fragmentKeyIndexes = 0;
 const defaultRenderer = new ReactRenderer();
 
-export function XBBCodeRenderer(props: { children: string, options?: Options, renderer?: ReactRenderer }): React.ReactElement;
-export function XBBCodeRenderer(props: { text: string, children: never, options?: Options, renderer?: ReactRenderer }): React.ReactElement;
-export function XBBCodeRenderer(props: { text?: string, children: string | never, options?: Options, renderer?: ReactRenderer }) {
+export function XBBCodeRenderer(props: { children: string, options?: ParseOptions, renderer?: ReactRenderer }): React.ReactElement;
+export function XBBCodeRenderer(props: { text: string, children: never, options?: ParseOptions, renderer?: ReactRenderer }): React.ReactElement;
+export function XBBCodeRenderer(props: { text, children, options?, renderer? }) {
     try {
-        const elements = parse(props.text || props.children, props.options);
+        const elements = parseBBCode(props.text || props.children, props.options);
         return (
             <React.Fragment key={"success"}>
                 {

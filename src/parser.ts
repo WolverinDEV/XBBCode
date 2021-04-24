@@ -1,9 +1,9 @@
-import {Element, TagElement, TextElement} from "./elements";
+import {BBCodeElement, BBCodeTagElement, BBCodeTextElement} from "./elements";
 import * as Registry from "./registry";
 
 const tagPattern = /^\/?(([a-zA-Z_\-]+(=[\S ]+)?)|(\*))$/g;
 
-export interface Options {
+export interface ParseOptions {
     maxDepth?: number;
     tagRegistry?: Registry.TagRegistry;
 
@@ -37,49 +37,64 @@ function parseTag(text: string) : { tag: string, close: boolean, options?: strin
 }
 
 /* concatenate all strings which are concatenate able */
-function fixStackStrings(layer: TagElement) : TagElement {
-    if(layer.content.length < 2)
+function simplifyStackStrings(layer: BBCodeTagElement) : BBCodeTagElement {
+    if(layer.content.length < 2) {
         return layer;
+    }
+
+    /* Deduct every element as text if possible */
+    for(let index = 0; index < layer.content.length; index++) {
+        const element = layer.content[index];
+        if(!(element instanceof BBCodeTagElement)) {
+            continue;
+        }
+
+        if(!element.deductibleAsText()) {
+            continue;
+        }
+
+        layer.content[index] = new BBCodeTextElement(element.deductAsText(), [], element.textPosition);
+    }
 
     for(let index = 0; index < layer.content.length - 1; index++) {
         let left = layer.content[index];
-        if(!(left instanceof TextElement)) {
-            if(left instanceof TagElement && left.deductibleAsText())
-                left = (layer.content[index] = new TextElement(left.deductAsText(), [], left.textPosition));
-            else
-                continue;
-        } else if(left.escapeCharacters) {
-            continue; /* Text isn't plain. Contains escape characters */
+        if(!(left instanceof BBCodeTextElement)) {
+            continue;
+        }
+
+        if(left.escapeCharacters.length > 0) {
+            /* Text isn't plain. Contains escape characters */
+            continue;
         }
 
         let right = layer.content[index + 1];
-        if(!(right instanceof TextElement)) {
-            if(right instanceof TagElement && right.deductibleAsText())
-                right = (layer.content[index + 1] = new TextElement(right.deductAsText(), [], right.textPosition));
-            else {
-                index++; /* if we shift it by one then right will be come left and we will still have a continue! */
-                continue;
-            }
-        } else if(right.escapeCharacters) {
-            continue; /* Text isn't plain. Contains escape characters */
+        if(!(right instanceof BBCodeTextElement)) {
+            continue;
         }
 
-        (left as TextElement).rawText += (right as TextElement).rawText;
-        (left as TextElement).textPosition.end = (right as TextElement).textPosition.end;
+        if(right.escapeCharacters.length > 0) {
+            /* Text isn't plain. Contains escape characters */
+            continue;
+        }
+
+        left.rawText += right.rawText;
+        left.textPosition.end = right.textPosition.end;
         layer.content.splice(index + 1, 1);
         index--;
     }
+
     return layer;
 }
 
-type BlackWhitelist = { blacklist: string[], whitelist?: string[], accept_tag(tag: string) : boolean };
-function buildTabBlackWhiteList(stack: TagElement[], options: Options) : BlackWhitelist {
+type BlackWhitelist = { blacklist: string[], whitelist?: string[], acceptsTag(tag: string) : boolean };
+function buildTabBlackWhiteList(stack: BBCodeTagElement[], options: ParseOptions) : BlackWhitelist {
     let blacklist = options.tag_blacklist || [], whitelist: string[] = options.tag_whitelist;
 
     for(let index = 0; index < stack.length; index++) {
         const tagType = stack[index].tagType;
-        if(typeof tagType === "undefined")
+        if(typeof tagType === "undefined") {
             continue;
+        }
 
         if(typeof(tagType.blacklistTags) !== "undefined") {
             for(const blacklist_entry of tagType.blacklistTags) {
@@ -92,8 +107,9 @@ function buildTabBlackWhiteList(stack: TagElement[], options: Options) : BlackWh
                         }
                     }
 
-                    if(flag_overridden)
+                    if(flag_overridden) {
                         continue;
+                    }
                 }
 
                 blacklist.push(blacklist_entry.tag);
@@ -101,9 +117,9 @@ function buildTabBlackWhiteList(stack: TagElement[], options: Options) : BlackWh
         }
 
         if(typeof(tagType.whitelistTags) !== "undefined") {
-            if(typeof(whitelist) === "undefined")
+            if(typeof(whitelist) === "undefined") {
                 whitelist = tagType.whitelistTags;
-            else {
+            } else {
                 whitelist = whitelist.filter(e => tagType.whitelistTags.findIndex(c => c == e) != -1);
             }
         }
@@ -113,9 +129,10 @@ function buildTabBlackWhiteList(stack: TagElement[], options: Options) : BlackWh
         blacklist: blacklist,
         whitelist: whitelist,
 
-        accept_tag: function(tag: string): boolean {
-            if(typeof(whitelist) !== "undefined" && this.whitelist.findIndex(e => e == tag) == -1)
+        acceptsTag: function(tag: string): boolean {
+            if(typeof(whitelist) !== "undefined" && this.whitelist.findIndex(e => e == tag) == -1) {
                 return false;
+            }
             return this.blacklist.findIndex(e => e == tag) == -1;
         }
     };
@@ -125,14 +142,14 @@ function isListTag(tag: string) : boolean {
     return ['list', 'ordered-list', 'olist', 'unordered-list', 'ulist', 'ul', 'ol'].findIndex(e => e == tag) !== -1;
 }
 
-function doParse(text: string, options: Options) : TagElement {
+function doParse(text: string, options: ParseOptions) : BBCodeTagElement {
     let black_whitelist: BlackWhitelist;
-    const stack: TagElement[] & { back() : TagElement } = [] as any;
+    const stack: BBCodeTagElement[] & { back() : BBCodeTagElement } = [] as any;
     stack.back = function() {
         return this[this.length - 1];
     };
 
-    stack.push(new TagElement("", undefined));
+    stack.push(new BBCodeTagElement("", undefined));
     stack.back().textPosition = {
         end: text.length,
         start: 0
@@ -141,32 +158,35 @@ function doParse(text: string, options: Options) : TagElement {
     black_whitelist = buildTabBlackWhiteList(stack, options);
 
     let escaped = [];
-    let base_index, index = 0, needle_index, escape_length;
+    let baseIndex, index = 0, needleIndex, escapeLength;
     while(true) {
-        base_index = index;
+        baseIndex = index;
 
-        if(stack.length > options.maxDepth)
+        if(stack.length > options.maxDepth) {
             throw "too many nested bb codes";
+        }
 
         /* find the open bracket */
-        needle_index = index;
+        needleIndex = index;
         while(true) {
-            needle_index = text.indexOf('[', needle_index);
+            needleIndex = text.indexOf('[', needleIndex);
 
-            if(needle_index > 0) {
-                escape_length = 0;
-                while(needle_index - escape_length > 0) {
-                    if(text[needle_index - escape_length - 1] != '\\')
+            if(needleIndex > 0) {
+                escapeLength = 0;
+                while(needleIndex - escapeLength > 0) {
+                    if(text[needleIndex - escapeLength - 1] != '\\') {
                         break;
-                    escape_length++;
+                    }
+                    escapeLength++;
                 }
 
-                for(let index = 0; index < escape_length; index += 2)
-                    escaped.push(needle_index - index - 1);
+                for(let index = 0; index < escapeLength; index += 2) {
+                    escaped.push(needleIndex - index - 1);
+                }
 
-                if(escape_length % 2 == 1) {
+                if(escapeLength % 2 == 1) {
                     //Tag isn't escaped. The escape has been escaped
-                    needle_index++;
+                    needleIndex++;
                     continue;
                 }
             }
@@ -174,40 +194,43 @@ function doParse(text: string, options: Options) : TagElement {
             break;
         }
 
-        if(needle_index == -1) { /* no close bracket */
+        if(needleIndex == -1) { /* no close bracket */
             /* get the last message */
-            if(index < text.length)
-                stack.back().content.push(new TextElement(text, escaped, index, text.length));
+            if(index < text.length) {
+                stack.back().content.push(new BBCodeTextElement(text, escaped, index, text.length));
+            }
             break;
         }
-        if(index != needle_index) {
+        if(index != needleIndex) {
             /* get the message before */
-            stack.back().content.push(new TextElement(text, escaped, index, needle_index));
+            stack.back().content.push(new BBCodeTextElement(text, escaped, index, needleIndex));
             escaped = [];
-            index = needle_index;
+            index = needleIndex;
         }
 
-        index = needle_index + 1; /* tag begin */
-        needle_index = index;
+        index = needleIndex + 1; /* tag begin */
+        needleIndex = index;
 
         /* find the next close bracket for the open tag */
         while(true) {
-            needle_index = text.indexOf(']', needle_index);
+            needleIndex = text.indexOf(']', needleIndex);
 
-            if(needle_index > 0) {
-                escape_length = 0;
-                while(needle_index - escape_length > 0) {
-                    if(text[needle_index - escape_length - 1] != '\\')
+            if(needleIndex > 0) {
+                escapeLength = 0;
+                while(needleIndex - escapeLength > 0) {
+                    if(text[needleIndex - escapeLength - 1] != '\\') {
                         break;
-                    escape_length++;
+                    }
+                    escapeLength++;
                 }
 
-                for(let index = 0; index < escape_length; index += 2)
-                    escaped.push(needle_index - index - 1);
+                for(let index = 0; index < escapeLength; index += 2) {
+                    escaped.push(needleIndex - index - 1);
+                }
 
-                if(escape_length % 2 == 1) {
+                if(escapeLength % 2 == 1) {
                     //Tag isn't escaped. The escape has been escaped
-                    needle_index++;
+                    needleIndex++;
                     continue;
                 }
             }
@@ -215,14 +238,15 @@ function doParse(text: string, options: Options) : TagElement {
             break;
         }
 
-        if(needle_index == -1) { /* no close bracket for close tag */
+        if(needleIndex == -1) { /* no close bracket for close tag */
             /* get the last message */
-            if(index < text.length)
-                stack.back().content.push(new TextElement(text, escaped, index - 1, text.length));
+            if(index < text.length) {
+                stack.back().content.push(new BBCodeTextElement(text, escaped, index - 1, text.length));
+            }
             break;
         }
 
-        const rawTag = text.substring(index, needle_index);
+        const rawTag = text.substring(index, needleIndex);
         let ignoreTag = !rawTag.match(tagPattern) && rawTag != "/";
 
         parseTag:
@@ -238,7 +262,7 @@ function doParse(text: string, options: Options) : TagElement {
                 }
 
                 blackWhiteCheck:
-                if(!black_whitelist.accept_tag(tag.tag.toLowerCase())) {
+                if(!black_whitelist.acceptsTag(tag.tag.toLowerCase())) {
                     /* we do not support this tag. Check if parse is null because if so we encountered a "lazy" close tag */
                     if(!parser) {
                         ignoreTag = true;
@@ -265,12 +289,13 @@ function doParse(text: string, options: Options) : TagElement {
                 while(--stackIndex > 0) {
                     if(stack[stackIndex].tagNormalized == tagNormalized || tagNormalized.length == 0) {
                         stack[stackIndex].properlyClosed = true;
-                        stack[stackIndex].textPosition.end = needle_index + 1;
+                        stack[stackIndex].textPosition.end = needleIndex + 1;
 
                         while(stack.length > stackIndex) {
-                            const pos = fixStackStrings(stack.pop()).textPosition;
-                            if(pos.end == -1)
+                            const pos = simplifyStackStrings(stack.pop()).textPosition;
+                            if(pos.end == -1) {
                                 pos.end = index - 1; /* we want the brace start as end of the last text! */
+                            }
                         }
 
                         black_whitelist = buildTabBlackWhiteList(stack, options);
@@ -285,7 +310,7 @@ function doParse(text: string, options: Options) : TagElement {
                     ignoreTag = true;
                 }
             } else {
-                const element = new TagElement(tag.tag, parser, tag.options);
+                const element = new BBCodeTagElement(tag.tag, parser, tag.options);
                 element.textPosition = {
                     start: index - 1, /* we want the brace start */
                     end: -1
@@ -293,15 +318,17 @@ function doParse(text: string, options: Options) : TagElement {
 
                 if(element.tagNormalized == '*') { /* list entry tag */
                     /* search for the base list again and append list entry */
-                    const cut_stack: TagElement[] = [];
+                    const cutStack: BBCodeTagElement[] = [];
                     let stack_index = stack.length;
                     while(--stack_index > 0) {
                         if(isListTag(stack[stack_index].tagNormalized)) {
-                            while(stack.length > stack_index + 1) /* we don't want to cut the list element itself! */
-                                cut_stack.unshift(fixStackStrings(stack.pop()));
+                            while(stack.length > stack_index + 1) {/* we don't want to cut the list element itself! */
+                                cutStack.unshift(simplifyStackStrings(stack.pop()));
+                            }
                             break;
-                        } else if(stack[stack_index].tagNormalized == '*' && stack[stack_index].properlyClosed)
+                        } else if(stack[stack_index].tagNormalized == '*' && stack[stack_index].properlyClosed) {
                             break;
+                        }
                     }
                     if(stack_index == 0) {
                         console.log("Invalid list handle!");
@@ -311,10 +338,11 @@ function doParse(text: string, options: Options) : TagElement {
                         black_whitelist = buildTabBlackWhiteList(stack, options);
 
                         /* set the last list tag as closed */
-                        cut_stack.forEach(e => e.textPosition.end = index - 1); /* we want the brace start as end of the last text! */
-                        const elm = cut_stack.filter(e => e.tagNormalized == '*');
-                        if(elm.length > 0)
+                        cutStack.forEach(e => e.textPosition.end = index - 1); /* we want the brace start as end of the last text! */
+                        const elm = cutStack.filter(e => e.tagNormalized == '*');
+                        if(elm.length > 0) {
                             elm[0].properlyClosed = true;
+                        }
                     }
                 }
 
@@ -332,40 +360,42 @@ function doParse(text: string, options: Options) : TagElement {
         }
 
         if(ignoreTag) {
-            stack.back().content.push(new TextElement(text, escaped, index - 1, needle_index + 1));
+            stack.back().content.push(new BBCodeTextElement(text, escaped, index - 1, needleIndex + 1));
             escaped = [];
-            index = needle_index + 1;
+            index = needleIndex + 1;
             continue;
         }
 
 
-        index = needle_index + 1;
+        index = needleIndex + 1;
     }
 
-    while(stack.length > 1)
-        fixStackStrings(stack.pop());
-    return fixStackStrings(stack[0]);
+    while(stack.length > 1) {
+        simplifyStackStrings(stack.pop());
+    }
+
+    return simplifyStackStrings(stack[0]);
 }
 
-function printStack(layer: Element, prefix?: string) {
-    if(layer instanceof TagElement) {
+function printStack(layer: BBCodeElement, prefix?: string) {
+    if(layer instanceof BBCodeTagElement) {
         prefix = prefix || "";
         console.log(prefix + "Tag: %s", layer.tagNormalized);
         console.log(prefix + "Closed: %o", layer.properlyClosed);
         console.log(prefix + "Range: %d - %d", layer.textPosition.start, layer.textPosition.end);
         console.log(prefix + "Children: (%d)", layer.content.length);
         layer.content.forEach(e => printStack(e, prefix + "  "));
-    } else if(layer instanceof TextElement) {
+    } else if(layer instanceof BBCodeTextElement) {
         console.log(prefix + "Range: %d - %d", layer.textPosition.start, layer.textPosition.end);
         console.log(prefix + "Raw Text: " + layer.rawText);
     }
 }
 
-export function parse(text: string, options_: Options) : Element[] {
+export function parseBBCode(text: string, options_: ParseOptions) : BBCodeElement[] {
     const options = Object.assign({}, options_);
 
     if(!options.tagRegistry) {
-        options.tagRegistry = Registry.Default;
+        options.tagRegistry = Registry.DefaultTagRegistry;
     }
 
     if(!options.maxDepth) {

@@ -1,9 +1,9 @@
-import {Element, TagElement, TextElement} from "../elements";
+import {BBCodeElement, BBCodeTagElement, BBCodeTextElement} from "../elements";
 import {StringRenderer} from "./base";
 
 export default class extends StringRenderer {
-    protected doRender(element: Element) : (Element | string)[] | string {
-        if(element instanceof TagElement) {
+    protected doRender(element: BBCodeElement) : (BBCodeElement | string)[] | string {
+        if(element instanceof BBCodeTagElement) {
             switch (element.tagType?.tag) {
                 case "br":
                 case "hr":
@@ -16,7 +16,7 @@ export default class extends StringRenderer {
 
                     return element.content;
             }
-        } else if(element instanceof TextElement) {
+        } else if(element instanceof BBCodeTextElement) {
             return element.text();
         } else {
             return "<-- invalid node -->";

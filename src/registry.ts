@@ -3,7 +3,7 @@ export interface ConditionalRule {
     overriddenBy: string[]; /* tag which overrides this rule */
 }
 
-export interface Tag {
+export interface BBCodeTag {
     tag: string;
     synonyms?: string[];
 
@@ -18,26 +18,28 @@ export interface Tag {
 export class TagRegistry {
     public readonly parent: TagRegistry | undefined;
 
-    private registeredTags: Tag[] = [];
-    private tagMap: {[key: string]: Tag | null} = {};
+    private registeredTags: BBCodeTag[] = [];
+    private tagMap: {[key: string]: BBCodeTag | null} = {};
 
     constructor(parent: TagRegistry | undefined) {
         this.parent = parent;
     }
 
-    public findTag(tag: string, normalized?: boolean) : Tag {
-        if(typeof normalized !== "boolean" || !normalized)
+    public findTag(tag: string, normalized?: boolean) : BBCodeTag {
+        if(typeof normalized !== "boolean" || !normalized) {
             tag = tag.toLowerCase();
+        }
 
         let result = this.tagMap[tag];
         return typeof result === "undefined" ? this.parent?.findTag(tag, true) : result ? result : undefined;
     }
 
 
-    public registerTag(tag: Tag) {
+    public registerTag(tag: BBCodeTag) {
         this.registeredTags.push(tag);
-        for(const tagName of [tag.tag, ...(tag.synonyms || [])])
+        for(const tagName of [tag.tag, ...(tag.synonyms || [])]) {
             this.tagMap[tagName.toLowerCase()] = tag;
+        }
     }
 
     public tags() {
@@ -45,48 +47,48 @@ export class TagRegistry {
     }
 }
 
-export const Default = new TagRegistry(undefined);
+export const DefaultTagRegistry = new TagRegistry(undefined);
 
-Default.registerTag({ tag: "no-parse", synonyms: ["noparse"], whitelistTags: [], ignore_black_whitelist: true });
+DefaultTagRegistry.registerTag({ tag: "no-parse", synonyms: ["noparse"], whitelistTags: [], ignore_black_whitelist: true });
 
-Default.registerTag({ tag: "center", synonyms: ["c"] });
-Default.registerTag({ tag: "right", synonyms: ["r"] });
-Default.registerTag({ tag: "left", synonyms: ["l"] });
+DefaultTagRegistry.registerTag({ tag: "center", synonyms: ["c"] });
+DefaultTagRegistry.registerTag({ tag: "right", synonyms: ["r"] });
+DefaultTagRegistry.registerTag({ tag: "left", synonyms: ["l"] });
 
-Default.registerTag({ tag: "bold", synonyms: ["b"] });
-Default.registerTag({ tag: "italic", synonyms: ["i"] });
-Default.registerTag({ tag: "underlined", synonyms: ["u"] });
-Default.registerTag({ tag: "strikethrough", synonyms: ["s"] });
+DefaultTagRegistry.registerTag({ tag: "bold", synonyms: ["b"] });
+DefaultTagRegistry.registerTag({ tag: "italic", synonyms: ["i"] });
+DefaultTagRegistry.registerTag({ tag: "underlined", synonyms: ["u"] });
+DefaultTagRegistry.registerTag({ tag: "strikethrough", synonyms: ["s"] });
 
-Default.registerTag({ tag: "code", whitelistTags: [] });
-Default.registerTag({ tag: "i-code", synonyms: ["icode"], whitelistTags: [] });
+DefaultTagRegistry.registerTag({ tag: "code", whitelistTags: [] });
+DefaultTagRegistry.registerTag({ tag: "i-code", synonyms: ["icode"], whitelistTags: [] });
 
-Default.registerTag({ tag: "color", synonyms: ["colour"] });
-Default.registerTag({ tag: "bg-color", synonyms: ["bg-colour", "bgcolor", "bgcolour"] });
+DefaultTagRegistry.registerTag({ tag: "color", synonyms: ["colour"] });
+DefaultTagRegistry.registerTag({ tag: "bg-color", synonyms: ["bg-colour", "bgcolor", "bgcolour"] });
 
-Default.registerTag({ tag: "font" });
-Default.registerTag({ tag: "size" });
+DefaultTagRegistry.registerTag({ tag: "font" });
+DefaultTagRegistry.registerTag({ tag: "size" });
 
-Default.registerTag({ tag: "url", whitelistTags: [] });
-Default.registerTag({ tag: "img", whitelistTags: [] });
+DefaultTagRegistry.registerTag({ tag: "url", whitelistTags: [] });
+DefaultTagRegistry.registerTag({ tag: "img", whitelistTags: [] });
 
-Default.registerTag({ tag: "quote" });
+DefaultTagRegistry.registerTag({ tag: "quote" });
 
-Default.registerTag({ tag: "sub" });
-Default.registerTag({ tag: "sup" });
+DefaultTagRegistry.registerTag({ tag: "sub" });
+DefaultTagRegistry.registerTag({ tag: "sup" });
 
-Default.registerTag({ tag: "br", instantClose: true });
-Default.registerTag({ tag: "hr", instantClose: true });
+DefaultTagRegistry.registerTag({ tag: "br", instantClose: true });
+DefaultTagRegistry.registerTag({ tag: "hr", instantClose: true });
 
-Default.registerTag({ tag: "ordered-list", synonyms: ["olist", "ol", "list"] });
-Default.registerTag({ tag: "unordered-list", synonyms: ["ulist", "ul"] });
+DefaultTagRegistry.registerTag({ tag: "ordered-list", synonyms: ["olist", "ol", "list"] });
+DefaultTagRegistry.registerTag({ tag: "unordered-list", synonyms: ["ulist", "ul"] });
 
-Default.registerTag({ tag: "li", synonyms: ["*"] });
+DefaultTagRegistry.registerTag({ tag: "li", synonyms: ["*"] });
 
-Default.registerTag({ tag: "table" });
-Default.registerTag({ tag: "table-head", synonyms: ["th"] });
-Default.registerTag({ tag: "table-row", synonyms: ["tr"] });
+DefaultTagRegistry.registerTag({ tag: "table" });
+DefaultTagRegistry.registerTag({ tag: "table-head", synonyms: ["th"] });
+DefaultTagRegistry.registerTag({ tag: "table-row", synonyms: ["tr"] });
 
-Default.registerTag({ tag: "td" });
+DefaultTagRegistry.registerTag({ tag: "td" });
 
-Default.registerTag({ tag: "youtube", synonyms: ["yt"], whitelistTags: [] });
+DefaultTagRegistry.registerTag({ tag: "youtube", synonyms: ["yt"], whitelistTags: [] });
