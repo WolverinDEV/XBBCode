@@ -2,7 +2,7 @@ import * as React from "react";
 import {Renderer} from "./base";
 import TextRenderer from "./text";
 import {BBCodeElement, BBCodeTagElement, BBCodeTextElement} from "../elements";
-import {kColorNames, kRegexColorValue} from "xbbcode/renderer/colors";
+import {kColorNames, kRegexColorValue} from "./colors";
 import * as TagRegistry from "../registry";
 
 const cssStyle = require("./react.scss");
