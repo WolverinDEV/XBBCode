@@ -92,13 +92,13 @@ export default class ReactRenderer extends Renderer<React.ReactNode> {
 }
 const RenderElement = (props: { element: BBCodeElement, renderer: ReactRenderer }) => props.renderer.render(props.element) as any;
 
-TagRenderer[undefined as any] = tag => {
+TagRenderer[undefined as any] = (tag, _, renderer) => {
     const openTag = "[" + tag.tag + (tag.options ? "=" + tag.options : "") + "]";
     if(tag.tagType?.instantClose) {
         return openTag;
     }
 
-    return openTag + tag.content.map(this.renderDefault.bind(this)) + "[/" + tag.tag + "]";
+    return openTag + tag.content.map(entry => renderer.render(entry)) + "[/" + tag.tag + "]";
 };
 
 TagRenderer["no-parse"] = (tag, _, renderer) => renderer.renderAsText(textRenderer.render(tag), true);
